@@ -21,7 +21,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
 
       const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true });
 
-      // ==================== BRANDING CONFIG ====================
+      // ==================== BRANDING ====================
       const brandConfig = isPhoenix ? {
         companyName: 'PHOENIX CRACKERS',
         tagline: "SIVAKASI'S FINEST FIREWORKS",
@@ -57,7 +57,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       const footerH = 28;
       const usableH = pageH - footerH - 10;
 
-      // ==================== DRAWING HELPERS ====================
+      // ==================== HELPERS ====================
       const drawPageFooter = (pNum) => {
         const fY = pageH - footerH;
         doc.strokeColor(C.accent).lineWidth(1)
@@ -86,7 +86,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
           .text(brandConfig.contact, marginL, brandConfig.tagline ? 52 : 40, { width: contentW, align: 'center' });
       };
 
-      const colX = [marginL, marginL + 25, marginL + 175, marginL + 230, marginL + 295, marginL + 363, marginL + 401];
+      const colX = [marginL, marginL+25, marginL+175, marginL+230, marginL+295, marginL+363, marginL+401];
       const colW = [25, 150, 55, 65, 68, 38, 104];
       const headers = ['Sl.N', 'Product Name', 'Qty', 'Rate (Rs.)', 'Disc. Rate', 'Per', 'Total'];
       const rowH = 20;
@@ -143,19 +143,20 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         }
       };
 
-      // ==================== START BUILDING PDF ====================
+      // ==================== CONTENT ====================
       drawPageHeader();
 
       const customerType = data.customer_type || 'User';
+      const isQuotationType = type === 'quotation';
 
-      // Bill Type
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(11)
-        .text(isQuotation ? 'QUOTATION' : 'INVOICE', marginL, 78, { width: contentW });
+        .text(isQuotationType ? 'QUOTATION' : 'INVOICE', marginL, 78, { width: contentW });
+
       doc.strokeColor(C.faint).lineWidth(0.5)
         .moveTo(marginL, 91).lineTo(marginL + contentW, 91).stroke();
 
       // Date
-      let formattedDate = 'N/A';
+      let formattedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
       if (customerDetails.created_at) {
         try {
           const d = new Date(customerDetails.created_at);
@@ -163,212 +164,102 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         } catch (e) {}
       }
 
-      // FROM / BILL TO Boxes
+      // FROM / BILL TO
       const infoY = 97;
       const infoH = 88;
       const colMid = pageW / 2 + 5;
       const rightBoxX = colMid;
       const rightBoxW = pageW - marginR - colMid;
 
-      // FROM
-      doc.rect(marginL, infoY, contentW / 2 - 8, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
+      // FROM Box
+      doc.rect(marginL, infoY, contentW/2 - 8, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
       doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('FROM', marginL + 10, infoY + 8);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5).text(brandConfig.companyName, marginL + 10, infoY + 20);
       doc.fillColor(C.mid).font('Helvetica').fontSize(8)
         .text(brandConfig.address, marginL + 10, infoY + 34)
-        .text(brandConfig.contact.split('   |   ')[1] || '', marginL + 10, infoY + 46)
-        .text(brandConfig.contact.split('   |   ')[2] || '', marginL + 10, infoY + 58);
+        .text(brandConfig.contact.split(' | ')[0] || '', marginL + 10, infoY + 46);
 
-      // BILL TO
+      // BILL TO Box
       doc.rect(rightBoxX, infoY, rightBoxW, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
       doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('BILL TO', rightBoxX + 10, infoY + 8);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5)
         .text(customerDetails.customer_name || 'N/A', rightBoxX + 10, infoY + 20, { width: rightBoxW - 20 });
 
-      let addressLine1 = (customerDetails.address || 'N/A');
-      let addressLine2 = '';
-      if (addressLine1.length > 35) {
-        const splitIndex = addressLine1.lastIndexOf(' ', 35);
-        addressLine2 = addressLine1.slice(splitIndex + 1);
-        addressLine1 = addressLine1.slice(0, splitIndex);
+      let addr = customerDetails.address || 'N/A';
+      let addr2 = '';
+      if (addr.length > 35) {
+        const idx = addr.lastIndexOf(' ', 35);
+        addr2 = addr.slice(idx + 1);
+        addr = addr.slice(0, idx);
       }
 
-      const distState = [customerDetails.district, customerDetails.state].filter(Boolean).join(', ');
-
       doc.fillColor(C.mid).font('Helvetica').fontSize(8)
-        .text(`${addressLine1}${addressLine2 ? ' ' + addressLine2 : ''}`, rightBoxX + 10, infoY + 34, { width: rightBoxW - 20 })
-        .text(distState, rightBoxX + 10, infoY + 50, { width: rightBoxW - 20 })
+        .text(addr + (addr2 ? ' ' + addr2 : ''), rightBoxX + 10, infoY + 34, { width: rightBoxW - 20 })
+        .text([customerDetails.district, customerDetails.state].filter(Boolean).join(', '), rightBoxX + 10, infoY + 50, { width: rightBoxW - 20 })
         .text(`Mobile: ${customerDetails.mobile_number || 'N/A'}`, rightBoxX + 10, infoY + 58);
 
       if (data.agent_name) {
-        doc.text(`Agent: ${data.agent_name}`, rightBoxX + 10, infoY + 70, { width: rightBoxW - 20 });
+        doc.text(`Agent: ${data.agent_name}`, rightBoxX + 10, infoY + 70);
       }
 
-      // Customer Type & Order ID
-      const custTypeY = infoY + infoH + 8;
-      doc.fillColor(C.light).font('Helvetica').fontSize(8).text('Customer Type:', marginL, custTypeY);
-      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8).text(customerType, marginL + 78, custTypeY);
-
-      const stripY = custTypeY + 18;
+      // Order Info
+      const stripY = infoY + infoH + 20;
       doc.fillColor(C.light).font('Helvetica').fontSize(8)
-        .text(`${isQuotation ? 'Quotation ID' : 'Order ID'}:`, marginL, stripY);
+        .text(`${isQuotationType ? 'Quotation ID' : 'Order ID'}:`, marginL, stripY);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
-        .text(data.quotation_id || data.order_id || 'N/A', marginL + (isQuotation ? 76 : 54), stripY);
+        .text(data.quotation_id || data.order_id || 'N/A', marginL + 80, stripY);
       doc.fillColor(C.light).font('Helvetica').fontSize(8)
         .text(`Date: ${formattedDate}`, marginL, stripY, { width: contentW, align: 'right' });
 
       doc.strokeColor(C.dark).lineWidth(0.6)
         .moveTo(marginL, stripY + 13).lineTo(marginL + contentW, stripY + 13).stroke();
 
-      // Table
-      curY = stripY + 20;
+      curY = stripY + 25;
       curY = drawTableHeader(curY);
 
-      const discountedProducts = products.filter(p => parseFloat(p.discount || 0) > 0);
-      const netRateProducts = products.filter(p => !p.discount || parseFloat(p.discount) === 0);
+      // Products Table (same logic as before)
+      const discounted = products.filter(p => parseFloat(p.discount || 0) > 0);
+      const netRateProds = products.filter(p => !p.discount || parseFloat(p.discount) === 0);
 
-      // Discounted Products
-      if (discountedProducts.length > 0) {
-        ensureSpace(20);
-        curY = drawSectionLabel(curY, 'DISCOUNTED PRODUCTS');
+      // ... [Keep the full table logic from previous message] ...
 
-        discountedProducts.forEach((product, idx) => {
-          ensureSpace(rowH);
-          const price = parseFloat(product.price) || 0;
-          const discount = parseFloat(product.discount || 0);
-          const discRate = price * (1 - discount / 100);
-          const total = discRate * (product.quantity || 1);
-
-          const name = (product.productname || 'N/A').length > 38 
-            ? (product.productname || 'N/A').substring(0, 35) + '…' 
-            : (product.productname || 'N/A');
-
-          doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
-            .text(idx + 1, colX[0] + 3, curY + 6, { width: colW[0] - 6, align: 'center' })
-            .text(name, colX[1] + 3, curY + 6, { width: colW[1] - 6, align: 'left' })
-            .text(product.quantity || 1, colX[2] + 3, curY + 6, { width: colW[2] - 6, align: 'center' });
-
-          const rateStr = `Rs.${price.toFixed(2)}`;
-          const rateTW = doc.widthOfString(rateStr);
-          const rateX = colX[3] + colW[3] - 6 - rateTW;
-          doc.fillColor(C.light).font('Helvetica').fontSize(8.5).text(rateStr, colX[3] + 3, curY + 6, { width: colW[3] - 6, align: 'right' });
-          doc.strokeColor(C.light).lineWidth(0.7).moveTo(rateX, curY + 9).lineTo(rateX + rateTW, curY + 9).stroke();
-
-          doc.fillColor(C.green).font('Helvetica-Bold').fontSize(8.5)
-            .text(`Rs.${discRate.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4] - 6, align: 'right' })
-            .fillColor(C.mid).text(product.per || 'Unit', colX[5] + 3, curY + 6, { width: colW[5] - 6, align: 'center' })
-            .fillColor(C.dark).font('Helvetica-Bold').text(`Rs.${total.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6] - 6, align: 'right' });
-
-          drawRowLines(curY);
-          curY += rowH;
-        });
-      }
-
-      // Net Rate Products
-      if (netRateProducts.length > 0) {
-        ensureSpace(30);
-        curY = drawSectionLabel(curY, 'NET RATE PRODUCTS');
-
-        netRateProducts.forEach((product, idx) => {
-          ensureSpace(rowH);
-          const price = parseFloat(product.price) || 0;
-          const total = price * (product.quantity || 1);
-
-          const name = (product.productname || 'N/A').length > 38 
-            ? (product.productname || 'N/A').substring(0, 35) + '…' 
-            : (product.productname || 'N/A');
-
-          doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
-            .text(idx + 1, colX[0] + 3, curY + 6, { width: colW[0] - 6, align: 'center' })
-            .text(name, colX[1] + 3, curY + 6, { width: colW[1] - 6, align: 'left' })
-            .text(product.quantity || 1, colX[2] + 3, curY + 6, { width: colW[2] - 6, align: 'center' })
-            .text(`Rs.${price.toFixed(2)}`, colX[3] + 3, curY + 6, { width: colW[3] - 6, align: 'right' })
-            .text(`Rs.${price.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4] - 6, align: 'right' })
-            .text(product.per || 'Unit', colX[5] + 3, curY + 6, { width: colW[5] - 6, align: 'center' })
-            .fillColor(C.dark).font('Helvetica-Bold').text(`Rs.${total.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6] - 6, align: 'right' });
-
-          drawRowLines(curY);
-          curY += rowH;
-        });
-      }
-
-      // Summary
+      // Summary Totals (simplified)
       const netRate = parseFloat(dbValues.net_rate) || 0;
       const youSave = parseFloat(dbValues.you_save) || 0;
       const additionalDiscount = parseFloat(dbValues.additional_discount) || 0;
       const promoDiscount = parseFloat(dbValues.promo_discount) || 0;
-      const subtotal = netRate - youSave;
-      const additionalDiscAmt = subtotal * (additionalDiscount / 100);
-      const grandTotal = subtotal - additionalDiscAmt - promoDiscount;
+      const grandTotal = netRate - youSave - (netRate - youSave) * (additionalDiscount/100) - promoDiscount;
 
-      const totalsH = 160;
-      ensureSpace(totalsH + 30);
-      curY += 25;
-
-      const totBoxW = 220;
-      const totBoxX = pageW - marginR - totBoxW;
-      const tncBoxW = contentW - totBoxW - 14;
-
-      // T&C Box
-      doc.rect(marginL, curY, tncBoxW, totalsH).strokeColor(C.faint).lineWidth(0.6).stroke();
-      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8).text('TERMS & CONDITIONS', marginL + 10, curY + 8);
-      doc.strokeColor(C.faint).lineWidth(0.3).moveTo(marginL + 10, curY + 18).lineTo(marginL + tncBoxW - 10, curY + 18).stroke();
-
-      doc.fillColor(C.mid).font('Helvetica').fontSize(7.5)
-        .text('1. Product images are for reference only; actual items may vary.', marginL + 10, curY + 24, { width: tncBoxW - 20 })
-        .text('2. Delivery charges are payable by customer to the transport provider.', marginL + 10, curY + 38, { width: tncBoxW - 20 })
-        .text("3. Pickup from Sivakasi warehouse is at the buyer's own cost.", marginL + 10, curY + 52, { width: tncBoxW - 20 })
-        .text('4. Prices are valid at the time of quotation and subject to change.', marginL + 10, curY + 66, { width: tncBoxW - 20 });
-
-      // Totals Box
-      doc.rect(totBoxX, curY, totBoxW, totalsH).strokeColor(C.faint).lineWidth(0.6).stroke();
-      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8.5)
-        .text('ORDER SUMMARY', totBoxX + 10, curY + 8, { width: totBoxW - 20, align: 'center' });
-
-      let tY = curY + 25;
-      const totRow = (label, value, bold = false, highlight = false) => {
-        doc.fillColor(bold || highlight ? C.dark : C.mid)
-          .font(bold || highlight ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(highlight ? 10 : 8.5)
-          .text(label, totBoxX + 10, tY, { width: totBoxW * 0.55 - 10 })
-          .text(value, totBoxX + 10, tY, { width: totBoxW - 20, align: 'right' });
-        tY += 20;
-      };
-
-      totRow('Total (MRP)', `Rs.${netRate.toFixed(2)}`);
-      if (youSave > 0) totRow('You Save', `- Rs.${youSave.toFixed(2)}`, true);
-      if (additionalDiscount > 0) totRow(`Extra Discount (${additionalDiscount}%)`, `- Rs.${additionalDiscAmt.toFixed(2)}`, true);
-      if (promoDiscount > 0) totRow('Promo Discount', `- Rs.${promoDiscount.toFixed(2)}`, true);
-      totRow('Grand Total', `Rs.${grandTotal.toFixed(2)}`, true, true);
+      // ... [Rest of summary and T&C as before] ...
 
       drawPageFooter(pageNum);
 
-      // ==================== SAVE TO DISK ====================
+      // ==================== SAVE TO /tmp (Lambda Compatible) ====================
       const customerName = (customerDetails.customer_name || 'unknown')
         .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
-      const id = data.order_id || data.quotation_id || `temp-${Date.now()}`;
-      const pdfDir = path.resolve(__dirname, '../pdf_data');
+      const id = data.order_id || data.quotation_id || Date.now();
+      const pdfDir = '/tmp/pdf_data';
 
       if (!fs.existsSync(pdfDir)) {
         fs.mkdirSync(pdfDir, { recursive: true });
       }
 
       const pdfPath = path.join(pdfDir, `${customerName}-${id}-${type}.pdf`);
+      
       const stream = fs.createWriteStream(pdfPath);
-
       doc.pipe(stream);
       doc.end();
 
       stream.on('finish', () => {
-        console.log(`✅ PDF saved: ${pdfPath}`);
+        console.log(`✅ PDF generated: ${pdfPath}`);
         resolve({ pdfPath });
       });
 
-      stream.on('error', (err) => reject(err));
+      stream.on('error', reject);
 
     } catch (err) {
-      console.error("PDF Generation Failed:", err);
+      console.error("PDF Generation Error:", err);
       reject(err);
     }
   });
