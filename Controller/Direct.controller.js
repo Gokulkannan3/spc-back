@@ -105,10 +105,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         });
 
         colX.forEach((x, i) => {
-          if (i > 0) {
-            doc.strokeColor(C.faint).lineWidth(0.4)
-              .moveTo(x, y).lineTo(x, y + 18).stroke();
-          }
+          if (i > 0) doc.strokeColor(C.faint).lineWidth(0.4).moveTo(x, y).lineTo(x, y + 18).stroke();
         });
         return y + 18;
       };
@@ -147,15 +144,12 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       drawPageHeader();
 
       const customerType = data.customer_type || 'User';
-      const isQuotationType = type === 'quotation';
 
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(11)
-        .text(isQuotationType ? 'QUOTATION' : 'INVOICE', marginL, 78, { width: contentW });
-
+        .text(isQuotation ? 'QUOTATION' : 'INVOICE', marginL, 78, { width: contentW });
       doc.strokeColor(C.faint).lineWidth(0.5)
         .moveTo(marginL, 91).lineTo(marginL + contentW, 91).stroke();
 
-      // Date
       let formattedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
       if (customerDetails.created_at) {
         try {
@@ -164,7 +158,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         } catch (e) {}
       }
 
-      // FROM / BILL TO
+      // FROM / BILL TO (same as before)
       const infoY = 97;
       const infoH = 88;
       const colMid = pageW / 2 + 5;
@@ -172,40 +166,38 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       const rightBoxW = pageW - marginR - colMid;
 
       // FROM Box
-      doc.rect(marginL, infoY, contentW/2 - 8, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
-      doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('FROM', marginL + 10, infoY + 8);
-      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5).text(brandConfig.companyName, marginL + 10, infoY + 20);
+      doc.rect(marginL, infoY, contentW/2-8, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
+      doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('FROM', marginL+10, infoY+8);
+      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5).text(brandConfig.companyName, marginL+10, infoY+20);
       doc.fillColor(C.mid).font('Helvetica').fontSize(8)
-        .text(brandConfig.address, marginL + 10, infoY + 34)
-        .text(brandConfig.contact.split(' | ')[0] || '', marginL + 10, infoY + 46);
+        .text(brandConfig.address, marginL+10, infoY+34)
+        .text(brandConfig.contact.split('   |   ')[1] || '', marginL+10, infoY+46);
 
       // BILL TO Box
       doc.rect(rightBoxX, infoY, rightBoxW, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
-      doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('BILL TO', rightBoxX + 10, infoY + 8);
+      doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('BILL TO', rightBoxX+10, infoY+8);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5)
-        .text(customerDetails.customer_name || 'N/A', rightBoxX + 10, infoY + 20, { width: rightBoxW - 20 });
+        .text(customerDetails.customer_name || 'N/A', rightBoxX+10, infoY+20, { width: rightBoxW-20 });
 
-      let addr = customerDetails.address || 'N/A';
+      let addr1 = (customerDetails.address || 'N/A');
       let addr2 = '';
-      if (addr.length > 35) {
-        const idx = addr.lastIndexOf(' ', 35);
-        addr2 = addr.slice(idx + 1);
-        addr = addr.slice(0, idx);
+      if (addr1.length > 35) {
+        const idx = addr1.lastIndexOf(' ', 35);
+        addr2 = addr1.slice(idx+1);
+        addr1 = addr1.slice(0, idx);
       }
 
       doc.fillColor(C.mid).font('Helvetica').fontSize(8)
-        .text(addr + (addr2 ? ' ' + addr2 : ''), rightBoxX + 10, infoY + 34, { width: rightBoxW - 20 })
-        .text([customerDetails.district, customerDetails.state].filter(Boolean).join(', '), rightBoxX + 10, infoY + 50, { width: rightBoxW - 20 })
-        .text(`Mobile: ${customerDetails.mobile_number || 'N/A'}`, rightBoxX + 10, infoY + 58);
+        .text(addr1 + (addr2 ? ' ' + addr2 : ''), rightBoxX+10, infoY+34, { width: rightBoxW-20 })
+        .text([customerDetails.district, customerDetails.state].filter(Boolean).join(', '), rightBoxX+10, infoY+50, { width: rightBoxW-20 })
+        .text(`Mobile: ${customerDetails.mobile_number || 'N/A'}`, rightBoxX+10, infoY+58);
 
-      if (data.agent_name) {
-        doc.text(`Agent: ${data.agent_name}`, rightBoxX + 10, infoY + 70);
-      }
+      if (data.agent_name) doc.text(`Agent: ${data.agent_name}`, rightBoxX+10, infoY+70);
 
-      // Order Info
-      const stripY = infoY + infoH + 20;
+      // Order Info Row
+      const stripY = infoY + infoH + 18;
       doc.fillColor(C.light).font('Helvetica').fontSize(8)
-        .text(`${isQuotationType ? 'Quotation ID' : 'Order ID'}:`, marginL, stripY);
+        .text(`${isQuotation ? 'Quotation ID' : 'Order ID'}:`, marginL, stripY);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
         .text(data.quotation_id || data.order_id || 'N/A', marginL + 80, stripY);
       doc.fillColor(C.light).font('Helvetica').fontSize(8)
@@ -214,52 +206,158 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       doc.strokeColor(C.dark).lineWidth(0.6)
         .moveTo(marginL, stripY + 13).lineTo(marginL + contentW, stripY + 13).stroke();
 
+      // ==================== TABLE ====================
       curY = stripY + 25;
       curY = drawTableHeader(curY);
 
-      // Products Table (same logic as before)
-      const discounted = products.filter(p => parseFloat(p.discount || 0) > 0);
-      const netRateProds = products.filter(p => !p.discount || parseFloat(p.discount) === 0);
+      const discountedProducts = products.filter(p => parseFloat(p.discount || 0) > 0);
+      const netRateProducts = products.filter(p => !p.discount || parseFloat(p.discount) === 0);
 
-      // ... [Keep the full table logic from previous message] ...
+      // Discounted Products
+      if (discountedProducts.length > 0) {
+        ensureSpace(25);
+        curY = drawSectionLabel(curY, 'DISCOUNTED PRODUCTS');
 
-      // Summary Totals (simplified)
+        discountedProducts.forEach((product, idx) => {
+          ensureSpace(rowH);
+          const price = parseFloat(product.price) || 0;
+          const discount = parseFloat(product.discount || 0);
+          const discRate = price * (1 - discount / 100);
+          const total = discRate * (product.quantity || 1);
+
+          const name = (product.productname || 'N/A').length > 38 
+            ? (product.productname || 'N/A').substring(0, 35) + '…' 
+            : (product.productname || 'N/A');
+
+          doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
+            .text(idx + 1, colX[0] + 3, curY + 6, { width: colW[0]-6, align: 'center' })
+            .text(name, colX[1] + 3, curY + 6, { width: colW[1]-6, align: 'left' })
+            .text(product.quantity || 1, colX[2] + 3, curY + 6, { width: colW[2]-6, align: 'center' });
+
+          // Strikethrough original price
+          const rateStr = `Rs.${price.toFixed(2)}`;
+          const rateTW = doc.widthOfString(rateStr);
+          const rateX = colX[3] + colW[3] - 6 - rateTW;
+          doc.fillColor(C.light).font('Helvetica').fontSize(8.5)
+            .text(rateStr, colX[3] + 3, curY + 6, { width: colW[3]-6, align: 'right' });
+          doc.strokeColor(C.light).lineWidth(0.7)
+            .moveTo(rateX, curY + 9).lineTo(rateX + rateTW, curY + 9).stroke();
+
+          doc.fillColor(C.green).font('Helvetica-Bold').fontSize(8.5)
+            .text(`Rs.${discRate.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4]-6, align: 'right' })
+            .fillColor(C.mid).text(product.per || 'Unit', colX[5] + 3, curY + 6, { width: colW[5]-6, align: 'center' })
+            .fillColor(C.dark).font('Helvetica-Bold').text(`Rs.${total.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6]-6, align: 'right' });
+
+          drawRowLines(curY);
+          curY += rowH;
+        });
+      }
+
+      // Net Rate Products
+      if (netRateProducts.length > 0) {
+        ensureSpace(30);
+        curY = drawSectionLabel(curY, 'NET RATE PRODUCTS');
+
+        netRateProducts.forEach((product, idx) => {
+          ensureSpace(rowH);
+          const price = parseFloat(product.price) || 0;
+          const total = price * (product.quantity || 1);
+
+          const name = (product.productname || 'N/A').length > 38 
+            ? (product.productname || 'N/A').substring(0, 35) + '…' 
+            : (product.productname || 'N/A');
+
+          doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
+            .text(idx + 1, colX[0] + 3, curY + 6, { width: colW[0]-6, align: 'center' })
+            .text(name, colX[1] + 3, curY + 6, { width: colW[1]-6, align: 'left' })
+            .text(product.quantity || 1, colX[2] + 3, curY + 6, { width: colW[2]-6, align: 'center' })
+            .text(`Rs.${price.toFixed(2)}`, colX[3] + 3, curY + 6, { width: colW[3]-6, align: 'right' })
+            .text(`Rs.${price.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4]-6, align: 'right' })
+            .text(product.per || 'Unit', colX[5] + 3, curY + 6, { width: colW[5]-6, align: 'center' })
+            .fillColor(C.dark).font('Helvetica-Bold').text(`Rs.${total.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6]-6, align: 'right' });
+
+          drawRowLines(curY);
+          curY += rowH;
+        });
+      }
+
+      if (products.length === 0) {
+        doc.fillColor(C.mid).font('Helvetica').fontSize(12)
+          .text('No products found', marginL, curY + 20, { width: contentW, align: 'center' });
+      }
+
+      // Summary
       const netRate = parseFloat(dbValues.net_rate) || 0;
       const youSave = parseFloat(dbValues.you_save) || 0;
       const additionalDiscount = parseFloat(dbValues.additional_discount) || 0;
       const promoDiscount = parseFloat(dbValues.promo_discount) || 0;
-      const grandTotal = netRate - youSave - (netRate - youSave) * (additionalDiscount/100) - promoDiscount;
+      const subtotal = netRate - youSave;
+      const addDiscAmt = subtotal * (additionalDiscount / 100);
+      const grandTotal = subtotal - addDiscAmt - promoDiscount;
 
-      // ... [Rest of summary and T&C as before] ...
+      const totalsH = 160;
+      ensureSpace(totalsH + 30);
+      curY += 25;
+
+      const totBoxW = 220;
+      const totBoxX = pageW - marginR - totBoxW;
+      const tncBoxW = contentW - totBoxW - 14;
+
+      // T&C
+      doc.rect(marginL, curY, tncBoxW, totalsH).strokeColor(C.faint).lineWidth(0.6).stroke();
+      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8).text('TERMS & CONDITIONS', marginL + 10, curY + 8);
+      doc.strokeColor(C.faint).lineWidth(0.3).moveTo(marginL+10, curY+18).lineTo(marginL+tncBoxW-10, curY+18).stroke();
+
+      doc.fillColor(C.mid).font('Helvetica').fontSize(7.5)
+        .text('1. Product images are for reference only.', marginL+10, curY+24, {width: tncBoxW-20})
+        .text('2. Delivery charges payable by customer.', marginL+10, curY+38, {width: tncBoxW-20})
+        .text('3. Prices subject to change.', marginL+10, curY+52, {width: tncBoxW-20});
+
+      // Totals
+      doc.rect(totBoxX, curY, totBoxW, totalsH).strokeColor(C.faint).lineWidth(0.6).stroke();
+      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8.5)
+        .text('ORDER SUMMARY', totBoxX+10, curY+8, {align: 'center'});
+
+      let tY = curY + 28;
+      const totRow = (label, value, bold = false) => {
+        doc.fillColor(bold ? C.dark : C.mid).font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5)
+          .text(label, totBoxX + 12, tY, { width: totBoxW * 0.55 })
+          .text(value, totBoxX + 12, tY, { width: totBoxW - 24, align: 'right' });
+        tY += 19;
+      };
+
+      totRow('Total (MRP)', `Rs.${netRate.toFixed(2)}`);
+      if (youSave > 0) totRow('You Save', `- Rs.${youSave.toFixed(2)}`, true);
+      if (additionalDiscount > 0) totRow(`Extra Disc (${additionalDiscount}%)`, `- Rs.${addDiscAmt.toFixed(2)}`, true);
+      if (promoDiscount > 0) totRow('Promo Discount', `- Rs.${promoDiscount.toFixed(2)}`, true);
+      totRow('Grand Total', `Rs.${grandTotal.toFixed(2)}`, true);
 
       drawPageFooter(pageNum);
 
-      // ==================== SAVE TO /tmp (Lambda Compatible) ====================
+      // ==================== SAVE PDF ====================
       const customerName = (customerDetails.customer_name || 'unknown')
         .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
       const id = data.order_id || data.quotation_id || Date.now();
       const pdfDir = '/tmp/pdf_data';
 
-      if (!fs.existsSync(pdfDir)) {
-        fs.mkdirSync(pdfDir, { recursive: true });
-      }
+      if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
 
       const pdfPath = path.join(pdfDir, `${customerName}-${id}-${type}.pdf`);
-      
+
       const stream = fs.createWriteStream(pdfPath);
       doc.pipe(stream);
       doc.end();
 
       stream.on('finish', () => {
-        console.log(`✅ PDF generated: ${pdfPath}`);
+        console.log(`✅ PDF Generated: ${pdfPath}`);
         resolve({ pdfPath });
       });
 
       stream.on('error', reject);
 
     } catch (err) {
-      console.error("PDF Generation Error:", err);
+      console.error("PDF Error:", err);
       reject(err);
     }
   });
