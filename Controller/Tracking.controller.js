@@ -24,15 +24,15 @@ const createTransportTable = `
   )
 `;
 
-const alterBookingsTable = `
-  ALTER TABLE bookings
-  ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20),
-  ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(100),
-  ADD COLUMN IF NOT EXISTS amount_paid NUMERIC
-`;
+// const alterBookingsTable = `
+//   ALTER TABLE bookings
+//   ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20),
+//   ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(100),
+//   ADD COLUMN IF NOT EXISTS amount_paid NUMERIC
+// `;
 
-pool.query(createTransportTable).catch((err) => console.error('Error creating transport table:', err));
-pool.query(alterBookingsTable).catch((err) => console.error('Error altering bookings table:', err));
+// pool.query(createTransportTable).catch((err) => console.error('Error creating transport table:', err));
+// pool.query(alterBookingsTable).catch((err) => console.error('Error altering bookings table:', err));
 
 async function sendStatusUpdate(mobileNumber, status, transportDetails = null) {
   if (!mobileNumber) {

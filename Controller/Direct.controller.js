@@ -13,81 +13,89 @@ const pool = new Pool({
 });
 
 
-const generatePDF = (type, data, customerDetails, products, dbValues) => {
+const generatePDF = (type, data, customerDetails, products, dbValues, options = {}) => {
   return new Promise((resolve, reject) => {
     try {
+      const isPhoenix = options.brand === 'phoenix';
+      const isQuotation = type === 'quotation';
+
       const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true });
 
-      const customerName = customerDetails.customer_name || 'unknown_customer';
-      const safeCustomerName = customerName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-      const id = data.order_id || data.quotation_id || `temp-${Date.now()}`;
-
-      const pdfDir = path.resolve(__dirname, '../pdf_data');
-      if (!fs.existsSync(pdfDir)) {
-        fs.mkdirSync(pdfDir, { recursive: true });
-        fs.chmodSync(pdfDir, 0o770);
-      }
-      const pdfPath = path.join(pdfDir, `${safeCustomerName}-${id}-${type}.pdf`);
-      const stream = fs.createWriteStream(pdfPath, { flags: 'w', mode: 0o660 });
-      doc.pipe(stream);
-
-      // ── Colour palette (print-friendly — mostly black/grey, no fills) ──
-      const C = {
-        black:       '#000000',
-        dark:        '#1C1917',
-        mid:         '#44403C',
-        light:       '#78716C',
-        faint:       '#D6D3D1',
-        green:       '#15803D',
-        white:       '#FFFFFF',
-        accent:      '#EA580C',  // used ONLY for company name text + footer underline
+      // ==================== BRANDING CONFIG ====================
+      const brandConfig = isPhoenix ? {
+        companyName: 'PHOENIX CRACKERS',
+        tagline: "SIVAKASI'S FINEST FIREWORKS",
+        contact: 'www.funwithcrackers.com   |   +91 63836 59214   |   nivasramasamy27@gmail.com',
+        address: 'Sivakasi, Tamil Nadu',
+        accent: '#1D4ED8',
+        footerText: 'Thank you for your business with Phoenix Crackers, Sivakasi'
+      } : {
+        companyName: 'Sree Palaniyappa Crackers',
+        tagline: '',
+        contact: 'www.palaniyappacrackers.com   |   +91 81242 59430   |   sreepalaniyappacrackers@gmail.com',
+        address: 'Vaanakkar street, Salem, Tamil Nadu',
+        accent: '#EA580C',
+        footerText: 'Thank you for your business with Sree Planiyappa Crackers, Sivakasi'
       };
 
-      const pageW    = doc.page.width;
-      const pageH    = doc.page.height;
-      const marginL  = 45;
-      const marginR  = 45;
-      const contentW = pageW - marginL - marginR;
-      const footerH  = 28;
-      const usableH  = pageH - footerH - 10;
+      const C = {
+        black: '#000000',
+        dark: isPhoenix ? '#1E293B' : '#1C1917',
+        mid: isPhoenix ? '#475569' : '#44403C',
+        light: isPhoenix ? '#94A3B8' : '#78716C',
+        faint: isPhoenix ? '#CBD5E1' : '#D6D3D1',
+        accent: brandConfig.accent,
+        green: '#15803D',
+        white: '#FFFFFF',
+      };
 
-      // ── Footer — plain text + one thin underline accent ─────────────
+      const pageW = doc.page.width;
+      const pageH = doc.page.height;
+      const marginL = 45;
+      const marginR = 45;
+      const contentW = pageW - marginL - marginR;
+      const footerH = 28;
+      const usableH = pageH - footerH - 10;
+
+      // ==================== DRAWING HELPERS ====================
       const drawPageFooter = (pNum) => {
         const fY = pageH - footerH;
-        // Single thin orange underline at top of footer area
         doc.strokeColor(C.accent).lineWidth(1)
           .moveTo(marginL, fY).lineTo(marginL + contentW, fY).stroke();
+
         doc.fillColor(C.mid).font('Helvetica').fontSize(7.5)
-          .text('Thank you for your business with Sree Planiyappa Crackers, Sivakasi',
-            marginL, fY + 8, { width: contentW - 40, align: 'left' });
+          .text(brandConfig.footerText, marginL, fY + 8, { width: contentW - 40, align: 'left' });
+
         doc.fillColor(C.light).font('Helvetica-Bold').fontSize(8)
           .text(`Page ${pNum}`, marginL, fY + 8, { width: contentW, align: 'right' });
       };
 
-      // ── Header — text only, no background fill ──────────────────────
       const drawPageHeader = () => {
-        // Thick bottom border under header area
         doc.strokeColor(C.faint).lineWidth(1)
           .moveTo(marginL, 68).lineTo(marginL + contentW, 68).stroke();
+
         doc.fillColor(C.accent).font('Helvetica-Bold').fontSize(22)
-          .text('Sree Palaniyappa Crackers', marginL, 10, { width: contentW, align: 'center' });
-        doc.fillColor(C.mid).font('Times-BoldItalic').fontSize(10)
-          .text('www.palaniyappacrackers.com   |   +91 81242 59430   |   sreepalaniyappacrackers@gmail.com',
-            marginL, 52, { width: contentW, align: 'center' });
+          .text(brandConfig.companyName, marginL, 14, { width: contentW, align: 'center' });
+
+        if (brandConfig.tagline) {
+          doc.fillColor(C.mid).font('Helvetica').fontSize(8)
+            .text(brandConfig.tagline, marginL, 40, { width: contentW, align: 'center' });
+        }
+
+        doc.fillColor(C.light).fontSize(7.5)
+          .text(brandConfig.contact, marginL, brandConfig.tagline ? 52 : 40, { width: contentW, align: 'center' });
       };
 
-      // ── Table columns ───────────────────────────────────────────────
-      // colW sums: 25+150+55+65+68+38+104 = 505 = contentW (595-45-45) ✓
-      const colX    = [marginL, marginL+25, marginL+175, marginL+230, marginL+295, marginL+363, marginL+401];
-      const colW    = [25, 150, 55, 65, 68, 38, 104];
+      const colX = [marginL, marginL + 25, marginL + 175, marginL + 230, marginL + 295, marginL + 363, marginL + 401];
+      const colW = [25, 150, 55, 65, 68, 38, 104];
       const headers = ['Sl.N', 'Product Name', 'Qty', 'Rate (Rs.)', 'Disc. Rate', 'Per', 'Total'];
-      const rowH    = 20;
+      const rowH = 20;
 
       const drawTableHeader = (y) => {
-        // Bottom border under header row instead of filled background
         doc.strokeColor(C.dark).lineWidth(0.8)
           .moveTo(marginL, y).lineTo(marginL + contentW, y).stroke()
           .moveTo(marginL, y + 18).lineTo(marginL + contentW, y + 18).stroke();
+
         headers.forEach((h, i) => {
           doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
             .text(h, colX[i] + 3, y + 5, {
@@ -95,7 +103,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues) => {
               align: i === 0 || i === 2 || i === 5 ? 'center' : i >= 3 ? 'right' : 'left',
             });
         });
-        // Vertical dividers in header
+
         colX.forEach((x, i) => {
           if (i > 0) {
             doc.strokeColor(C.faint).lineWidth(0.4)
@@ -106,7 +114,6 @@ const generatePDF = (type, data, customerDetails, products, dbValues) => {
       };
 
       const drawSectionLabel = (y, label) => {
-        // Just bold underlined text — no background
         doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8.5)
           .text(label, marginL, y + 3, { width: contentW });
         doc.strokeColor(C.faint).lineWidth(0.5)
@@ -122,10 +129,8 @@ const generatePDF = (type, data, customerDetails, products, dbValues) => {
         });
       };
 
-      // ── State ───────────────────────────────────────────────────────
-      let pageNum  = 1;
-      let curY     = 0;
-      let rowIndex = 0;
+      let pageNum = 1;
+      let curY = 0;
 
       const ensureSpace = (needed) => {
         if (curY + needed > usableH) {
@@ -133,21 +138,19 @@ const generatePDF = (type, data, customerDetails, products, dbValues) => {
           doc.addPage();
           pageNum++;
           drawPageHeader();
-          curY     = 76;
-          curY     = drawTableHeader(curY);
-          rowIndex = 0;
+          curY = 76;
+          curY = drawTableHeader(curY);
         }
       };
 
-      // ────────────────────────────────────────────────────────────────
-      // PAGE 1 CONTENT
-      // ────────────────────────────────────────────────────────────────
+      // ==================== START BUILDING PDF ====================
       drawPageHeader();
 
-      // Bill type label — bold text + underline, no background
-      const isQuotation = type === 'quotation';
+      const customerType = data.customer_type || 'User';
+
+      // Bill Type
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(11)
-        .text(isQuotation ? 'QUOTATION' : 'ESTIMATE', marginL, 78, { width: contentW });
+        .text(isQuotation ? 'QUOTATION' : 'INVOICE', marginL, 78, { width: contentW });
       doc.strokeColor(C.faint).lineWidth(0.5)
         .moveTo(marginL, 91).lineTo(marginL + contentW, 91).stroke();
 
@@ -155,256 +158,218 @@ const generatePDF = (type, data, customerDetails, products, dbValues) => {
       let formattedDate = 'N/A';
       if (customerDetails.created_at) {
         try {
-          if (typeof customerDetails.created_at === 'string' && customerDetails.created_at.includes('/')) {
-            formattedDate = customerDetails.created_at;
-          } else {
-            const d = customerDetails.created_at instanceof Date
-              ? customerDetails.created_at : new Date(customerDetails.created_at);
-            if (!isNaN(d.getTime()))
-              formattedDate = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-          }
-        } catch (e) { /* ignore */ }
+          const d = new Date(customerDetails.created_at);
+          formattedDate = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch (e) {}
       }
 
-      // ── FROM / BILL TO — two columns, bordered boxes, no fill ───────
-      const infoY     = 97;
-      const infoH     = 74;
-      const colMid    = pageW / 2 + 5;
+      // FROM / BILL TO Boxes
+      const infoY = 97;
+      const infoH = 88;
+      const colMid = pageW / 2 + 5;
       const rightBoxX = colMid;
       const rightBoxW = pageW - marginR - colMid;
 
-      // FROM box — border only
-      doc.rect(marginL, infoY, contentW / 2 - 8, infoH)
-        .strokeColor(C.faint).lineWidth(0.6).stroke();
-      doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5)
-        .text('FROM', marginL + 10, infoY + 8);
-      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5)
-        .text('Sree Palaniyappa Crackers', marginL + 10, infoY + 20);
+      // FROM
+      doc.rect(marginL, infoY, contentW / 2 - 8, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
+      doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('FROM', marginL + 10, infoY + 8);
+      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5).text(brandConfig.companyName, marginL + 10, infoY + 20);
       doc.fillColor(C.mid).font('Helvetica').fontSize(8)
-        .text('Vaanakkar street, Salem, Tamil Nadu',         marginL + 10, infoY + 34)
-        .text('+91 81242 59430',              marginL + 10, infoY + 46)
-        .text('sreepalaniyappacrackers@gmail.com', marginL + 10, infoY + 58);
+        .text(brandConfig.address, marginL + 10, infoY + 34)
+        .text(brandConfig.contact.split('   |   ')[1] || '', marginL + 10, infoY + 46)
+        .text(brandConfig.contact.split('   |   ')[2] || '', marginL + 10, infoY + 58);
 
-      // BILL TO box — border only
-      doc.rect(rightBoxX, infoY, rightBoxW, infoH)
-        .strokeColor(C.faint).lineWidth(0.6).stroke();
-      doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5)
-        .text('BILL TO', rightBoxX + 10, infoY + 8);
+      // BILL TO
+      doc.rect(rightBoxX, infoY, rightBoxW, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
+      doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('BILL TO', rightBoxX + 10, infoY + 8);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5)
         .text(customerDetails.customer_name || 'N/A', rightBoxX + 10, infoY + 20, { width: rightBoxW - 20 });
 
-      let addressText = customerDetails.address || 'N/A';
-      if (addressText.length > 38) addressText = addressText.substring(0, 35) + '…';
+      let addressLine1 = (customerDetails.address || 'N/A');
+      let addressLine2 = '';
+      if (addressLine1.length > 35) {
+        const splitIndex = addressLine1.lastIndexOf(' ', 35);
+        addressLine2 = addressLine1.slice(splitIndex + 1);
+        addressLine1 = addressLine1.slice(0, splitIndex);
+      }
+
       const distState = [customerDetails.district, customerDetails.state].filter(Boolean).join(', ');
+
       doc.fillColor(C.mid).font('Helvetica').fontSize(8)
-        .text(addressText, rightBoxX + 10, infoY + 34, { width: rightBoxW - 20 })
-        .text(distState,   rightBoxX + 10, infoY + 46, { width: rightBoxW - 20 })
+        .text(`${addressLine1}${addressLine2 ? ' ' + addressLine2 : ''}`, rightBoxX + 10, infoY + 34, { width: rightBoxW - 20 })
+        .text(distState, rightBoxX + 10, infoY + 50, { width: rightBoxW - 20 })
         .text(`Mobile: ${customerDetails.mobile_number || 'N/A'}`, rightBoxX + 10, infoY + 58);
+
       if (data.agent_name) {
         doc.text(`Agent: ${data.agent_name}`, rightBoxX + 10, infoY + 70, { width: rightBoxW - 20 });
       }
 
-      // ── Customer Type — plain label row ────────────────────────────
+      // Customer Type & Order ID
       const custTypeY = infoY + infoH + 8;
-      doc.fillColor(C.light).font('Helvetica').fontSize(8)
-        .text('Customer Type:', marginL, custTypeY);
-      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
-        .text(data.customer_type || 'User', marginL + 78, custTypeY);
-      doc.strokeColor(C.faint).lineWidth(0.4)
-        .moveTo(marginL, custTypeY + 12).lineTo(marginL + contentW, custTypeY + 12).stroke();
+      doc.fillColor(C.light).font('Helvetica').fontSize(8).text('Customer Type:', marginL, custTypeY);
+      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8).text(customerType, marginL + 78, custTypeY);
 
-      // ── Order ID / Date — plain label row ───────────────────────────
       const stripY = custTypeY + 18;
       doc.fillColor(C.light).font('Helvetica').fontSize(8)
         .text(`${isQuotation ? 'Quotation ID' : 'Order ID'}:`, marginL, stripY);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
-        .text(id, marginL + (isQuotation ? 76 : 54), stripY);
+        .text(data.quotation_id || data.order_id || 'N/A', marginL + (isQuotation ? 76 : 54), stripY);
       doc.fillColor(C.light).font('Helvetica').fontSize(8)
         .text(`Date: ${formattedDate}`, marginL, stripY, { width: contentW, align: 'right' });
+
       doc.strokeColor(C.dark).lineWidth(0.6)
         .moveTo(marginL, stripY + 13).lineTo(marginL + contentW, stripY + 13).stroke();
 
-      // ── Table ───────────────────────────────────────────────────────
+      // Table
       curY = stripY + 20;
       curY = drawTableHeader(curY);
 
       const discountedProducts = products.filter(p => parseFloat(p.discount || 0) > 0);
-      const netRateProducts    = products.filter(p => !p.discount || parseFloat(p.discount) === 0);
+      const netRateProducts = products.filter(p => !p.discount || parseFloat(p.discount) === 0);
 
-      // Discounted products
+      // Discounted Products
       if (discountedProducts.length > 0) {
-        ensureSpace(16 + rowH);
+        ensureSpace(20);
         curY = drawSectionLabel(curY, 'DISCOUNTED PRODUCTS');
 
         discountedProducts.forEach((product, idx) => {
           ensureSpace(rowH);
-          const price     = parseFloat(product.price) || 0;
-          const discount  = parseFloat(product.discount || 0);
-          const discRate  = price - price * discount / 100;
-          const lineTotal = discRate * (product.quantity || 1);
-          const name      = (product.productname || 'N/A').length > 38
-            ? product.productname.substring(0, 35) + '…'
+          const price = parseFloat(product.price) || 0;
+          const discount = parseFloat(product.discount || 0);
+          const discRate = price * (1 - discount / 100);
+          const total = discRate * (product.quantity || 1);
+
+          const name = (product.productname || 'N/A').length > 38 
+            ? (product.productname || 'N/A').substring(0, 35) + '…' 
             : (product.productname || 'N/A');
 
-          // No alternating fill — just white rows
-          doc.fillColor(C.mid).font('Helvetica').fontSize(9.5)
-            .text(idx + 1,               colX[0] + 3, curY + 6, { width: colW[0] - 6, align: 'center' })
-            .text(name,                  colX[1] + 3, curY + 6, { width: colW[1] - 6, align: 'left' })
+          doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
+            .text(idx + 1, colX[0] + 3, curY + 6, { width: colW[0] - 6, align: 'center' })
+            .text(name, colX[1] + 3, curY + 6, { width: colW[1] - 6, align: 'left' })
             .text(product.quantity || 1, colX[2] + 3, curY + 6, { width: colW[2] - 6, align: 'center' });
 
-          // Strikethrough original rate
           const rateStr = `Rs.${price.toFixed(2)}`;
-          const rateTW  = doc.widthOfString(rateStr, { fontSize: 9.5 });
-          const rateX   = colX[3] + colW[3] - 6 - rateTW;
-          doc.fillColor(C.light).font('Helvetica').fontSize(9.5)
-            .text(rateStr, colX[3] + 3, curY + 6, { width: colW[3] - 6, align: 'right' });
-          doc.strokeColor(C.light).lineWidth(0.7)
-            .moveTo(rateX, curY + 9).lineTo(rateX + rateTW, curY + 9).stroke();
+          const rateTW = doc.widthOfString(rateStr);
+          const rateX = colX[3] + colW[3] - 6 - rateTW;
+          doc.fillColor(C.light).font('Helvetica').fontSize(8.5).text(rateStr, colX[3] + 3, curY + 6, { width: colW[3] - 6, align: 'right' });
+          doc.strokeColor(C.light).lineWidth(0.7).moveTo(rateX, curY + 9).lineTo(rateX + rateTW, curY + 9).stroke();
 
-          doc.fillColor(C.green).font('Helvetica-Bold').fontSize(9.5)
-            .text(`Rs.${discRate.toFixed(2)}`,  colX[4] + 3, curY + 6, { width: colW[4] - 6, align: 'right' });
-          doc.fillColor(C.mid).font('Helvetica').fontSize(9.5)
-            .text(product.per || 'N/A',          colX[5] + 3, curY + 6, { width: colW[5] - 6, align: 'center' });
-          doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5)
-            .text(`Rs.${lineTotal.toFixed(2)}`,  colX[6] + 3, curY + 6, { width: colW[6] - 6, align: 'right' });
+          doc.fillColor(C.green).font('Helvetica-Bold').fontSize(8.5)
+            .text(`Rs.${discRate.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4] - 6, align: 'right' })
+            .fillColor(C.mid).text(product.per || 'Unit', colX[5] + 3, curY + 6, { width: colW[5] - 6, align: 'center' })
+            .fillColor(C.dark).font('Helvetica-Bold').text(`Rs.${total.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6] - 6, align: 'right' });
 
           drawRowLines(curY);
           curY += rowH;
-          rowIndex++;
         });
       }
 
-      // Net rate products
+      // Net Rate Products
       if (netRateProducts.length > 0) {
-        ensureSpace(24 + rowH);
-        curY += 6;
+        ensureSpace(30);
         curY = drawSectionLabel(curY, 'NET RATE PRODUCTS');
-        rowIndex = 0;
 
         netRateProducts.forEach((product, idx) => {
           ensureSpace(rowH);
-          const price     = parseFloat(product.price) || 0;
-          const discount  = parseFloat(product.discount || 0);
-          const discRate  = price - price * discount / 100;
-          const lineTotal = discRate * (product.quantity || 1);
-          const name      = (product.productname || 'N/A').length > 38
-            ? product.productname.substring(0, 35) + '…'
+          const price = parseFloat(product.price) || 0;
+          const total = price * (product.quantity || 1);
+
+          const name = (product.productname || 'N/A').length > 38 
+            ? (product.productname || 'N/A').substring(0, 35) + '…' 
             : (product.productname || 'N/A');
 
-          doc.fillColor(C.mid).font('Helvetica').fontSize(9.5)
-            .text(idx + 1,               colX[0] + 3, curY + 6, { width: colW[0] - 6, align: 'center' })
-            .text(name,                  colX[1] + 3, curY + 6, { width: colW[1] - 6, align: 'left' })
+          doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
+            .text(idx + 1, colX[0] + 3, curY + 6, { width: colW[0] - 6, align: 'center' })
+            .text(name, colX[1] + 3, curY + 6, { width: colW[1] - 6, align: 'left' })
             .text(product.quantity || 1, colX[2] + 3, curY + 6, { width: colW[2] - 6, align: 'center' })
-            .text(`Rs.${price.toFixed(2)}`,    colX[3] + 3, curY + 6, { width: colW[3] - 6, align: 'right' })
-            .text(`Rs.${discRate.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4] - 6, align: 'right' })
-            .text(product.per || 'N/A',        colX[5] + 3, curY + 6, { width: colW[5] - 6, align: 'center' });
-          doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8.5)
-            .text(`Rs.${lineTotal.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6] - 6, align: 'right' });
+            .text(`Rs.${price.toFixed(2)}`, colX[3] + 3, curY + 6, { width: colW[3] - 6, align: 'right' })
+            .text(`Rs.${price.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4] - 6, align: 'right' })
+            .text(product.per || 'Unit', colX[5] + 3, curY + 6, { width: colW[5] - 6, align: 'center' })
+            .fillColor(C.dark).font('Helvetica-Bold').text(`Rs.${total.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6] - 6, align: 'right' });
 
           drawRowLines(curY);
           curY += rowH;
-          rowIndex++;
         });
       }
 
-      // ── Summary totals ──────────────────────────────────────────────
-      const netRate            = parseFloat(dbValues.net_rate) || 0;
-      const youSave            = parseFloat(dbValues.you_save) || 0;
+      // Summary
+      const netRate = parseFloat(dbValues.net_rate) || 0;
+      const youSave = parseFloat(dbValues.you_save) || 0;
       const additionalDiscount = parseFloat(dbValues.additional_discount) || 0;
-      const subtotal           = netRate - youSave;
-      const additionalDiscAmt  = subtotal * (additionalDiscount / 100);
-      const discountedSubtotal = subtotal - additionalDiscAmt;
-      const processingFee      = parseFloat(dbValues.processing_fee) || discountedSubtotal * 0.025;
-      const total              = parseFloat(dbValues.total) || discountedSubtotal + processingFee;
       const promoDiscount = parseFloat(dbValues.promo_discount) || 0;
+      const subtotal = netRate - youSave;
+      const additionalDiscAmt = subtotal * (additionalDiscount / 100);
+      const grandTotal = subtotal - additionalDiscAmt - promoDiscount;
 
-      const hasExtraDiscount = additionalDiscount > 0 || promoDiscount > 0;
-      const summaryRowCount = 3 + (additionalDiscount > 0 ? 1 : 0) + (promoDiscount > 0 ? 1 : 0);
-      const totalsH         = 13 + summaryRowCount * 20 + 24 + 5 + (hasExtraDiscount ? 1 : 0);
+      const totalsH = 160;
+      ensureSpace(totalsH + 30);
+      curY += 25;
 
-      ensureSpace(totalsH + 16);
-      curY += 14;
-
-      const totBoxW = 215;
+      const totBoxW = 220;
       const totBoxX = pageW - marginR - totBoxW;
       const tncBoxW = contentW - totBoxW - 14;
 
-      // T&C — border box, no fill
-      doc.rect(marginL, curY, tncBoxW, totalsH)
-        .strokeColor(C.faint).lineWidth(0.6).stroke();
-      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
-        .text('TERMS & CONDITIONS', marginL + 10, curY + 8, { width: tncBoxW - 20 });
-      doc.strokeColor(C.faint).lineWidth(0.3)
-        .moveTo(marginL + 10, curY + 18).lineTo(marginL + tncBoxW - 10, curY + 18).stroke();
+      // T&C Box
+      doc.rect(marginL, curY, tncBoxW, totalsH).strokeColor(C.faint).lineWidth(0.6).stroke();
+      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8).text('TERMS & CONDITIONS', marginL + 10, curY + 8);
+      doc.strokeColor(C.faint).lineWidth(0.3).moveTo(marginL + 10, curY + 18).lineTo(marginL + tncBoxW - 10, curY + 18).stroke();
+
       doc.fillColor(C.mid).font('Helvetica').fontSize(7.5)
-        .text('1. Product images are for reference only; actual items may vary.',           marginL + 10, curY + 24, { width: tncBoxW - 20 })
-        .text('2. Delivery charges are payable by customer to the transport provider.',     marginL + 10, curY + 38, { width: tncBoxW - 20 })
-        .text("3. Pickup from Sivakasi warehouse is at the buyer's own cost.",              marginL + 10, curY + 52, { width: tncBoxW - 20 })
-        .text('4. Prices are valid at the time of quotation and subject to change.',        marginL + 10, curY + 66, { width: tncBoxW - 20 })
-        .text('5. We encourage you to visit our shop in person for a more personalized experience and better purchase decisions.', marginL + 10, curY + 80, { width: tncBoxW - 20 });
+        .text('1. Product images are for reference only; actual items may vary.', marginL + 10, curY + 24, { width: tncBoxW - 20 })
+        .text('2. Delivery charges are payable by customer to the transport provider.', marginL + 10, curY + 38, { width: tncBoxW - 20 })
+        .text("3. Pickup from Sivakasi warehouse is at the buyer's own cost.", marginL + 10, curY + 52, { width: tncBoxW - 20 })
+        .text('4. Prices are valid at the time of quotation and subject to change.', marginL + 10, curY + 66, { width: tncBoxW - 20 });
 
-      if (hasExtraDiscount) {
-        doc.fillColor(C.accent).font('Helvetica-Bold').fontSize(7.5)
-          .text('Have a safe and great Diwali! Safely fire the crackers.', marginL + 10, curY + 100, { width: tncBoxW - 20 });
-      }
-
-      // Totals — border box, no fill
-      doc.rect(totBoxX, curY, totBoxW, totalsH)
-        .strokeColor(C.faint).lineWidth(0.6).stroke();
-
-      // "ORDER SUMMARY" header — just bold text + underline
+      // Totals Box
+      doc.rect(totBoxX, curY, totBoxW, totalsH).strokeColor(C.faint).lineWidth(0.6).stroke();
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8.5)
-        .text('ORDER SUMMARY', totBoxX + 10, curY + 6, { width: totBoxW - 20, align: 'center' });
-      doc.strokeColor(C.faint).lineWidth(0.4)
-        .moveTo(totBoxX + 8, curY + 17).lineTo(totBoxX + totBoxW - 8, curY + 17).stroke();
+        .text('ORDER SUMMARY', totBoxX + 10, curY + 8, { width: totBoxW - 20, align: 'center' });
 
-      let tY = curY + 20;
-
+      let tY = curY + 25;
       const totRow = (label, value, bold = false, highlight = false) => {
-        if (highlight) {
-          // Total row — double line above + bold large text
-          doc.strokeColor(C.dark).lineWidth(0.6)
-            .moveTo(totBoxX + 8, tY - 3).lineTo(totBoxX + totBoxW - 8, tY - 3).stroke();
-          doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(10)
-            .text(label, totBoxX + 10, tY + 3, { width: totBoxW * 0.55 - 10 })
-            .text(value, totBoxX + 10, tY + 3, { width: totBoxW - 20, align: 'right' });
-        } else {
-          doc.fillColor(bold ? C.dark : C.mid)
-            .font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5)
-            .text(label, totBoxX + 10, tY, { width: totBoxW * 0.55 - 10 })
-            .text(value, totBoxX + 10, tY, { width: totBoxW - 20, align: 'right' });
-        }
+        doc.fillColor(bold || highlight ? C.dark : C.mid)
+          .font(bold || highlight ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(highlight ? 10 : 8.5)
+          .text(label, totBoxX + 10, tY, { width: totBoxW * 0.55 - 10 })
+          .text(value, totBoxX + 10, tY, { width: totBoxW - 20, align: 'right' });
         tY += 20;
       };
 
-      totRow('Net Rate (MRP)',      `Rs.${netRate.toFixed(2)}`);
-      totRow('Product Discount',    `- Rs.${youSave.toFixed(2)}`, true);
-      if (additionalDiscount > 0)
-        totRow(`Extra Discount (${additionalDiscount}%)`, `- Rs.${additionalDiscAmt.toFixed(2)}`, true);
-      if (promoDiscount > 0)
-        totRow('Promo Discount',    `- Rs.${promoDiscount.toFixed(2)}`, true);
-      totRow('Processing Fee (2.5%)', `Rs.${processingFee.toFixed(2)}`);
-      totRow('TOTAL PAYABLE',       `Rs.${total.toFixed(2)}`, true, true);
+      totRow('Total (MRP)', `Rs.${netRate.toFixed(2)}`);
+      if (youSave > 0) totRow('You Save', `- Rs.${youSave.toFixed(2)}`, true);
+      if (additionalDiscount > 0) totRow(`Extra Discount (${additionalDiscount}%)`, `- Rs.${additionalDiscAmt.toFixed(2)}`, true);
+      if (promoDiscount > 0) totRow('Promo Discount', `- Rs.${promoDiscount.toFixed(2)}`, true);
+      totRow('Grand Total', `Rs.${grandTotal.toFixed(2)}`, true, true);
 
-      // ── Footer (thin orange underline only) ─────────────────────────
       drawPageFooter(pageNum);
 
+      // ==================== SAVE TO DISK ====================
+      const customerName = (customerDetails.customer_name || 'unknown')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+      const id = data.order_id || data.quotation_id || `temp-${Date.now()}`;
+      const pdfDir = path.resolve(__dirname, '../pdf_data');
+
+      if (!fs.existsSync(pdfDir)) {
+        fs.mkdirSync(pdfDir, { recursive: true });
+      }
+
+      const pdfPath = path.join(pdfDir, `${customerName}-${id}-${type}.pdf`);
+      const stream = fs.createWriteStream(pdfPath);
+
+      doc.pipe(stream);
       doc.end();
 
       stream.on('finish', () => {
-        if (!fs.existsSync(pdfPath)) {
-          reject(new Error(`PDF file not found at ${pdfPath} for ${type}_id ${id}`));
-          return;
-        }
-        console.log(`PDF generated at: ${pdfPath} for ${type}_id: ${id}`);
+        console.log(`✅ PDF saved: ${pdfPath}`);
         resolve({ pdfPath });
       });
-      stream.on('error', (err) => {
-        reject(new Error(`Stream error: ${err.message}`));
-      });
+
+      stream.on('error', (err) => reject(err));
+
     } catch (err) {
-      console.error(`PDF generation failed: ${err.message}`);
-      reject(new Error(`PDF generation failed: ${err.message}`));
+      console.error("PDF Generation Failed:", err);
+      reject(err);
     }
   });
 };
