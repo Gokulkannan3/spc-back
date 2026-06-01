@@ -286,82 +286,92 @@ exports.getreportBookings = async (req, res) => {
 };
 
 exports.updateFilterBookingStatus = async (req, res) => {
+  let client;
   try {
     const { id } = req.params;
-    const { status, payment_method, transaction_id, amount_paid, transportDetails } = req.body;
-    console.log('Received Payload:', { status, payment_method, transaction_id, amount_paid });
+    const { 
+      status, 
+      transportName, 
+      lrNumber, 
+      transportContact,
+      transportDetails   // fallback
+    } = req.body;
+
+    console.log('🚀 Received Payload:', { id, status, transportName, lrNumber, transportContact });
+
+    if (!id) return res.status(400).json({ message: 'Booking ID required' });
 
     const validStatuses = ['booked', 'paid', 'packed', 'dispatched', 'delivered'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status value' });
     }
 
-    if (status === 'paid') {
-      if (amount_paid === undefined || amount_paid === null || isNaN(amount_paid) || amount_paid <= 0) {
-        return res.status(400).json({ message: 'Valid amount paid is required' });
-      }
-      if (!payment_method) {
-        return res.status(400).json({ message: 'Payment method is required for paid status' });
-      }
-      if (payment_method === 'bank' && (!transaction_id || transaction_id.trim() === '')) {
-        return res.status(400).json({ message: 'Transaction ID is required for bank payments' });
-      }
-    }
+    client = await pool.connect();
+    await client.query('BEGIN');
 
-    await pool.query('BEGIN');
+    // 1. Update bookings table
+    const bookingUpdate = await client.query(`
+      UPDATE public.bookings 
+      SET status = $1, updated_at = NOW()
+      WHERE id = $2 
+      RETURNING id, order_id, status, mobile_number
+    `, [status, id]);
 
-    // Build the update query dynamically
-    let query = `
-      UPDATE public.bookings
-      SET status = $1
-    `;
-    const params = [status];
-    let paramIndex = 2;
-
-    // Only update payment fields if status is 'paid'
-    if (status === 'paid') {
-      query += `, payment_method = $${paramIndex}, transaction_id = $${paramIndex + 1}, amount_paid = $${paramIndex + 2}`;
-      params.push(payment_method || null, transaction_id || null, amount_paid || null);
-      paramIndex += 3;
-    }
-
-    query += `
-      WHERE id = $${paramIndex}
-      RETURNING id, order_id, status, mobile_number, payment_method, transaction_id, amount_paid
-    `;
-    params.push(id);
-
-    const result = await pool.query(query, params);
-
-    if (result.rows.length === 0) {
-      await pool.query('ROLLBACK');
+    if (bookingUpdate.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Booking not found' });
     }
 
+    const booking = bookingUpdate.rows[0];
+
+    // 2. Handle Transport Details (without ON CONFLICT)
     let transportData = null;
-    if (status === 'dispatched' && transportDetails) {
-      const transportQuery = `
-        INSERT INTO transport_details (order_id, transport_name, lr_number, transport_contact)
-        VALUES ($1, $2, $3, $4)
-        RETURNING transport_name, lr_number, transport_contact
-      `;
-      const transportResult = await pool.query(transportQuery, [
-        result.rows[0].order_id,
-        transportDetails.transportName,
-        transportDetails.lrNumber,
-        transportDetails.transportContact || null,
-      ]);
-      transportData = transportResult.rows[0];
+    if (status === 'dispatched') {
+      const tName = transportName || transportDetails?.transportName || transportDetails?.transport_name;
+      const tLR = lrNumber || transportDetails?.lrNumber || transportDetails?.lr_number;
+      const tContact = transportContact || transportDetails?.transportContact || transportDetails?.transport_contact;
+
+      if (tName && tLR) {
+        // Delete old record if exists, then insert new one
+        await client.query('DELETE FROM transport_details WHERE order_id = $1', [booking.order_id]);
+
+        const insertResult = await client.query(`
+          INSERT INTO transport_details (order_id, transport_name, lr_number, transport_contact)
+          VALUES ($1, $2, $3, $4)
+          RETURNING transport_name, lr_number, transport_contact
+        `, [booking.order_id, tName, tLR, tContact || null]);
+
+        transportData = insertResult.rows[0];
+        console.log('✅ Transport details saved successfully:', transportData);
+      } else {
+        console.warn('⚠️ Missing transport details for dispatched status');
+      }
     }
 
-    await pool.query('COMMIT');
-    await sendStatusUpdate(result.rows[0].mobile_number, status, transportData);
+    await client.query('COMMIT');
 
-    res.status(200).json({ message: 'Status updated successfully', data: result.rows[0] });
+    // Send WhatsApp notification
+    await sendStatusUpdate(booking.mobile_number, status, transportData);
+
+    res.status(200).json({ 
+      message: 'Status updated successfully', 
+      data: { 
+        ...booking, 
+        transport_name: transportData?.transport_name,
+        lr_number: transportData?.lr_number,
+        transport_contact: transportData?.transport_contact 
+      } 
+    });
+
   } catch (err) {
-    await pool.query('ROLLBACK');
+    if (client) await client.query('ROLLBACK');
     console.error('Error updating booking status:', err);
-    res.status(500).json({ message: 'Failed to update booking status', error: err.message });
+    res.status(500).json({ 
+      message: 'Failed to update booking status', 
+      error: err.message 
+    });
+  } finally {
+    if (client) client.release();
   }
 };
 

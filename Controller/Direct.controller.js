@@ -12,6 +12,7 @@ const pool = new Pool({
   database: process.env.PGDATABASE,
 });
 
+const roundVal = (v) => Math.round(parseFloat(v) || 0);
 
 const generatePDF = (type, data, customerDetails, products, dbValues, options = {}) => {
   return new Promise((resolve, reject) => {
@@ -21,7 +22,6 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
 
       const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true });
 
-      // ==================== BRANDING ====================
       const brandConfig = isPhoenix ? {
         companyName: 'PHOENIX CRACKERS',
         tagline: "SIVAKASI'S FINEST FIREWORKS",
@@ -57,31 +57,25 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       const footerH = 28;
       const usableH = pageH - footerH - 10;
 
-      // ==================== HELPERS ====================
       const drawPageFooter = (pNum) => {
         const fY = pageH - footerH;
         doc.strokeColor(C.accent).lineWidth(1)
           .moveTo(marginL, fY).lineTo(marginL + contentW, fY).stroke();
-
         doc.fillColor(C.mid).font('Helvetica').fontSize(7.5)
           .text(brandConfig.footerText, marginL, fY + 8, { width: contentW - 40, align: 'left' });
-
-        doc.fillColor(C.light).font('Helvetica-Bold').fontSize(8)
+        doc.fillColor(C.light).font('Helvetica').fontSize(8)
           .text(`Page ${pNum}`, marginL, fY + 8, { width: contentW, align: 'right' });
       };
 
       const drawPageHeader = () => {
         doc.strokeColor(C.faint).lineWidth(1)
           .moveTo(marginL, 68).lineTo(marginL + contentW, 68).stroke();
-
         doc.fillColor(C.accent).font('Helvetica-Bold').fontSize(22)
           .text(brandConfig.companyName, marginL, 14, { width: contentW, align: 'center' });
-
         if (brandConfig.tagline) {
           doc.fillColor(C.mid).font('Helvetica').fontSize(8)
             .text(brandConfig.tagline, marginL, 40, { width: contentW, align: 'center' });
         }
-
         doc.fillColor(C.light).fontSize(7.5)
           .text(brandConfig.contact, marginL, brandConfig.tagline ? 52 : 40, { width: contentW, align: 'center' });
       };
@@ -95,7 +89,6 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         doc.strokeColor(C.dark).lineWidth(0.8)
           .moveTo(marginL, y).lineTo(marginL + contentW, y).stroke()
           .moveTo(marginL, y + 18).lineTo(marginL + contentW, y + 18).stroke();
-
         headers.forEach((h, i) => {
           doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
             .text(h, colX[i] + 3, y + 5, {
@@ -103,7 +96,6 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
               align: i === 0 || i === 2 || i === 5 ? 'center' : i >= 3 ? 'right' : 'left',
             });
         });
-
         colX.forEach((x, i) => {
           if (i > 0) doc.strokeColor(C.faint).lineWidth(0.4).moveTo(x, y).lineTo(x, y + 18).stroke();
         });
@@ -140,10 +132,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         }
       };
 
-      // ==================== CONTENT ====================
       drawPageHeader();
-
-      const customerType = data.customer_type || 'User';
 
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(11)
         .text(isQuotation ? 'QUOTATION' : 'INVOICE', marginL, 78, { width: contentW });
@@ -158,14 +147,12 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         } catch (e) {}
       }
 
-      // FROM / BILL TO (same as before)
       const infoY = 97;
       const infoH = 88;
       const colMid = pageW / 2 + 5;
       const rightBoxX = colMid;
       const rightBoxW = pageW - marginR - colMid;
 
-      // FROM Box
       doc.rect(marginL, infoY, contentW/2-8, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
       doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('FROM', marginL+10, infoY+8);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5).text(brandConfig.companyName, marginL+10, infoY+20);
@@ -173,7 +160,6 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         .text(brandConfig.address, marginL+10, infoY+34)
         .text(brandConfig.contact.split('   |   ')[1] || '', marginL+10, infoY+46);
 
-      // BILL TO Box
       doc.rect(rightBoxX, infoY, rightBoxW, infoH).strokeColor(C.faint).lineWidth(0.6).stroke();
       doc.fillColor(C.light).font('Helvetica-Bold').fontSize(7.5).text('BILL TO', rightBoxX+10, infoY+8);
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(9.5)
@@ -194,11 +180,10 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
 
       if (data.agent_name) doc.text(`Agent: ${data.agent_name}`, rightBoxX+10, infoY+70);
 
-      // Order Info Row
       const stripY = infoY + infoH + 18;
       doc.fillColor(C.light).font('Helvetica').fontSize(8)
         .text(`${isQuotation ? 'Quotation ID' : 'Order ID'}:`, marginL, stripY);
-      doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8)
+      doc.fillColor(C.dark).font('Helvetica').fontSize(8)
         .text(data.quotation_id || data.order_id || 'N/A', marginL + 80, stripY);
       doc.fillColor(C.light).font('Helvetica').fontSize(8)
         .text(`Date: ${formattedDate}`, marginL, stripY, { width: contentW, align: 'right' });
@@ -206,14 +191,12 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       doc.strokeColor(C.dark).lineWidth(0.6)
         .moveTo(marginL, stripY + 13).lineTo(marginL + contentW, stripY + 13).stroke();
 
-      // ==================== TABLE ====================
       curY = stripY + 25;
       curY = drawTableHeader(curY);
 
       const discountedProducts = products.filter(p => parseFloat(p.discount || 0) > 0);
       const netRateProducts = products.filter(p => !p.discount || parseFloat(p.discount) === 0);
 
-      // Discounted Products
       if (discountedProducts.length > 0) {
         ensureSpace(25);
         curY = drawSectionLabel(curY, 'DISCOUNTED PRODUCTS');
@@ -223,10 +206,10 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
           const price = parseFloat(product.price) || 0;
           const discount = parseFloat(product.discount || 0);
           const discRate = price * (1 - discount / 100);
-          const total = discRate * (product.quantity || 1);
+          const total = roundVal(discRate * (product.quantity || 1));
 
-          const name = (product.productname || 'N/A').length > 38 
-            ? (product.productname || 'N/A').substring(0, 35) + '…' 
+          const name = (product.productname || 'N/A').length > 38
+            ? (product.productname || 'N/A').substring(0, 35) + '…'
             : (product.productname || 'N/A');
 
           doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
@@ -234,8 +217,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
             .text(name, colX[1] + 3, curY + 6, { width: colW[1]-6, align: 'left' })
             .text(product.quantity || 1, colX[2] + 3, curY + 6, { width: colW[2]-6, align: 'center' });
 
-          // Strikethrough original price
-          const rateStr = `Rs.${price.toFixed(2)}`;
+          const rateStr = `Rs.${roundVal(price)}`;
           const rateTW = doc.widthOfString(rateStr);
           const rateX = colX[3] + colW[3] - 6 - rateTW;
           doc.fillColor(C.light).font('Helvetica').fontSize(8.5)
@@ -243,17 +225,16 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
           doc.strokeColor(C.light).lineWidth(0.7)
             .moveTo(rateX, curY + 9).lineTo(rateX + rateTW, curY + 9).stroke();
 
-          doc.fillColor(C.green).font('Helvetica-Bold').fontSize(8.5)
-            .text(`Rs.${discRate.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4]-6, align: 'right' })
+          doc.fillColor(C.green).font('Helvetica').fontSize(8.5)
+            .text(`Rs.${roundVal(discRate)}`, colX[4] + 3, curY + 6, { width: colW[4]-6, align: 'right' })
             .fillColor(C.mid).text(product.per || 'Unit', colX[5] + 3, curY + 6, { width: colW[5]-6, align: 'center' })
-            .fillColor(C.dark).font('Helvetica-Bold').text(`Rs.${total.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6]-6, align: 'right' });
+            .fillColor(C.dark).font('Helvetica').text(`Rs.${total}`, colX[6] + 3, curY + 6, { width: colW[6]-6, align: 'right' });
 
           drawRowLines(curY);
           curY += rowH;
         });
       }
 
-      // Net Rate Products
       if (netRateProducts.length > 0) {
         ensureSpace(30);
         curY = drawSectionLabel(curY, 'NET RATE PRODUCTS');
@@ -261,20 +242,20 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         netRateProducts.forEach((product, idx) => {
           ensureSpace(rowH);
           const price = parseFloat(product.price) || 0;
-          const total = price * (product.quantity || 1);
+          const total = roundVal(price * (product.quantity || 1));
 
-          const name = (product.productname || 'N/A').length > 38 
-            ? (product.productname || 'N/A').substring(0, 35) + '…' 
+          const name = (product.productname || 'N/A').length > 38
+            ? (product.productname || 'N/A').substring(0, 35) + '…'
             : (product.productname || 'N/A');
 
           doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
             .text(idx + 1, colX[0] + 3, curY + 6, { width: colW[0]-6, align: 'center' })
             .text(name, colX[1] + 3, curY + 6, { width: colW[1]-6, align: 'left' })
             .text(product.quantity || 1, colX[2] + 3, curY + 6, { width: colW[2]-6, align: 'center' })
-            .text(`Rs.${price.toFixed(2)}`, colX[3] + 3, curY + 6, { width: colW[3]-6, align: 'right' })
-            .text(`Rs.${price.toFixed(2)}`, colX[4] + 3, curY + 6, { width: colW[4]-6, align: 'right' })
+            .text(`Rs.${roundVal(price)}`, colX[3] + 3, curY + 6, { width: colW[3]-6, align: 'right' })
+            .text(`Rs.${roundVal(price)}`, colX[4] + 3, curY + 6, { width: colW[4]-6, align: 'right' })
             .text(product.per || 'Unit', colX[5] + 3, curY + 6, { width: colW[5]-6, align: 'center' })
-            .fillColor(C.dark).font('Helvetica-Bold').text(`Rs.${total.toFixed(2)}`, colX[6] + 3, curY + 6, { width: colW[6]-6, align: 'right' });
+            .fillColor(C.dark).font('Helvetica').text(`Rs.${total}`, colX[6] + 3, curY + 6, { width: colW[6]-6, align: 'right' });
 
           drawRowLines(curY);
           curY += rowH;
@@ -286,13 +267,12 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
           .text('No products found', marginL, curY + 20, { width: contentW, align: 'center' });
       }
 
-      // Summary
-      const netRate = parseFloat(dbValues.net_rate) || 0;
-      const youSave = parseFloat(dbValues.you_save) || 0;
+      const netRate = roundVal(dbValues.net_rate);
+      const youSave = roundVal(dbValues.you_save);
       const additionalDiscount = parseFloat(dbValues.additional_discount) || 0;
-      const promoDiscount = parseFloat(dbValues.promo_discount) || 0;
+      const promoDiscount = roundVal(dbValues.promo_discount);
       const subtotal = netRate - youSave;
-      const addDiscAmt = subtotal * (additionalDiscount / 100);
+      const addDiscAmt = roundVal(subtotal * (additionalDiscount / 100));
       const grandTotal = subtotal - addDiscAmt - promoDiscount;
 
       const totalsH = 160;
@@ -303,7 +283,6 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       const totBoxX = pageW - marginR - totBoxW;
       const tncBoxW = contentW - totBoxW - 14;
 
-      // T&C
       doc.rect(marginL, curY, tncBoxW, totalsH).strokeColor(C.faint).lineWidth(0.6).stroke();
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8).text('TERMS & CONDITIONS', marginL + 10, curY + 8);
       doc.strokeColor(C.faint).lineWidth(0.3).moveTo(marginL+10, curY+18).lineTo(marginL+tncBoxW-10, curY+18).stroke();
@@ -313,28 +292,26 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         .text('2. Delivery charges payable by customer.', marginL+10, curY+38, {width: tncBoxW-20})
         .text('3. Prices subject to change.', marginL+10, curY+52, {width: tncBoxW-20});
 
-      // Totals
       doc.rect(totBoxX, curY, totBoxW, totalsH).strokeColor(C.faint).lineWidth(0.6).stroke();
       doc.fillColor(C.dark).font('Helvetica-Bold').fontSize(8.5)
         .text('ORDER SUMMARY', totBoxX+10, curY+8, {align: 'center'});
 
       let tY = curY + 28;
-      const totRow = (label, value, bold = false) => {
-        doc.fillColor(bold ? C.dark : C.mid).font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5)
+      const totRow = (label, value) => {
+        doc.fillColor(C.mid).font('Helvetica').fontSize(8.5)
           .text(label, totBoxX + 12, tY, { width: totBoxW * 0.55 })
           .text(value, totBoxX + 12, tY, { width: totBoxW - 24, align: 'right' });
         tY += 19;
       };
 
-      totRow('Total (MRP)', `Rs.${netRate.toFixed(2)}`);
-      if (youSave > 0) totRow('You Save', `- Rs.${youSave.toFixed(2)}`, true);
-      if (additionalDiscount > 0) totRow(`Extra Disc (${additionalDiscount}%)`, `- Rs.${addDiscAmt.toFixed(2)}`, true);
-      if (promoDiscount > 0) totRow('Promo Discount', `- Rs.${promoDiscount.toFixed(2)}`, true);
-      totRow('Grand Total', `Rs.${grandTotal.toFixed(2)}`, true);
+      totRow('Total (MRP)', `Rs.${netRate}`);
+      if (youSave > 0) totRow('You Save', `- Rs.${youSave}`);
+      if (additionalDiscount > 0) totRow(`Extra Disc (${additionalDiscount}%)`, `- Rs.${addDiscAmt}`);
+      if (promoDiscount > 0) totRow('Promo Discount', `- Rs.${promoDiscount}`);
+      totRow('Grand Total', `Rs.${grandTotal}`);
 
       drawPageFooter(pageNum);
 
-      // ==================== SAVE PDF ====================
       const customerName = (customerDetails.customer_name || 'unknown')
         .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
@@ -350,7 +327,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       doc.end();
 
       stream.on('finish', () => {
-        console.log(`✅ PDF Generated: ${pdfPath}`);
+        console.log(`PDF Generated: ${pdfPath}`);
         resolve({ pdfPath });
       });
 
@@ -458,7 +435,7 @@ exports.getAllQuotations = async (req, res) => {
   try {
     const query = `
       SELECT id, customer_id, quotation_id, products, net_rate, you_save, total, promo_discount, additional_discount,
-             customer_name, address, mobile_number, email, district, state, customer_type, 
+             customer_name, address, mobile_number, email, district, state, customer_type,
              status, created_at, updated_at, pdf
       FROM public.quotations
       ORDER BY created_at DESC
@@ -480,9 +457,6 @@ exports.createQuotation = async (req, res) => {
       customer_type, customer_name, address, mobile_number, email, district, state
     } = req.body;
 
-    console.log(`Received createQuotation request with quotation_id: ${quotation_id}`);
-
-    // === Basic Validation ===
     if (!quotation_id || !/^[a-zA-Z0-9-_]+$/.test(quotation_id)) {
       return res.status(400).json({ message: 'Invalid or missing Quotation ID', quotation_id });
     }
@@ -493,13 +467,12 @@ exports.createQuotation = async (req, res) => {
       return res.status(400).json({ message: 'Total must be a positive number', quotation_id });
     }
 
-    const parsedNetRate = parseFloat(net_rate) || 0;
-    const parsedYouSave = parseFloat(you_save) || 0;
-    const parsedPromoDiscount = parseFloat(promo_discount) || 0;
+    const parsedNetRate = roundVal(net_rate);
+    const parsedYouSave = roundVal(you_save);
+    const parsedPromoDiscount = roundVal(promo_discount);
     const parsedAdditionalDiscount = parseFloat(additional_discount) || 0;
-    const parsedTotal = parseFloat(total);
+    const parsedTotal = roundVal(total);
 
-    // === Customer Validation (Fixed Foreign Key Issue) ===
     let finalCustomerType = customer_type || 'User';
     let customerDetails = { customer_name, address, mobile_number, email, district, state };
     let agent_name = null;
@@ -515,10 +488,10 @@ exports.createQuotation = async (req, res) => {
 
       if (customerCheck.rows.length === 0) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          message: 'Customer ID not found in database. Please select a valid customer.', 
+        return res.status(400).json({
+          message: 'Customer ID not found in database. Please select a valid customer.',
           customer_id,
-          quotation_id 
+          quotation_id
         });
       }
 
@@ -531,26 +504,24 @@ exports.createQuotation = async (req, res) => {
         if (agentCheck.rows.length > 0) agent_name = agentCheck.rows[0].customer_name;
       }
     } else {
-      // Direct customer entry (no customer_id)
       if (!customer_name || !mobile_number || !district || !state) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          message: 'Customer name, mobile number, district and state are required when no customer_id is provided', 
-          quotation_id 
+        return res.status(400).json({
+          message: 'Customer name, mobile number, district and state are required when no customer_id is provided',
+          quotation_id
         });
       }
     }
 
-    // === Enhance products with 'per' ===
     const enhancedProducts = [];
     for (const product of products) {
       const { id, product_type, quantity, price, discount, productname, per } = product;
-      if (!id || !product_type || !productname || quantity < 1 || 
+      if (!id || !product_type || !productname || quantity < 1 ||
           isNaN(parseFloat(price)) || isNaN(parseFloat(discount))) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ 
-          message: 'Invalid product entry (id, product_type, productname, quantity, price, discount required)', 
-          quotation_id 
+        return res.status(400).json({
+          message: 'Invalid product entry (id, product_type, productname, quantity, price, discount required)',
+          quotation_id
         });
       }
 
@@ -560,9 +531,9 @@ exports.createQuotation = async (req, res) => {
         const productCheck = await client.query(`SELECT per FROM public.${tableName} WHERE id = $1`, [id]);
         if (productCheck.rows.length === 0) {
           await client.query('ROLLBACK');
-          return res.status(404).json({ 
-            message: `Product ${id} of type ${product_type} not found`, 
-            quotation_id 
+          return res.status(404).json({
+            message: `Product ${id} of type ${product_type} not found`,
+            quotation_id
           });
         }
         productPer = productCheck.rows[0].per || productPer;
@@ -570,13 +541,11 @@ exports.createQuotation = async (req, res) => {
       enhancedProducts.push({ ...product, per: productPer });
     }
 
-    // === Calculate Processing Fee (2.5%) ===
     const subtotal = parsedNetRate - parsedYouSave;
-    const additionalDiscAmt = subtotal * (parsedAdditionalDiscount / 100);
+    const additionalDiscAmt = roundVal(subtotal * (parsedAdditionalDiscount / 100));
     const discountedSubtotal = subtotal - additionalDiscAmt;
-    const processingFee = discountedSubtotal * 0.025;   // ← 2.5%
+    const processingFee = roundVal(discountedSubtotal * 0.025);
 
-    // === Generate PDF ===
     let pdfPath;
     try {
       const now = new Date();
@@ -590,11 +559,11 @@ exports.createQuotation = async (req, res) => {
         { quotation_id, customer_type: finalCustomerType, total: parsedTotal, agent_name },
         { ...customerDetails, created_at: formattedISTDate },
         enhancedProducts,
-        { 
-          net_rate: parsedNetRate, 
-          you_save: parsedYouSave, 
-          total: parsedTotal, 
-          promo_discount: parsedPromoDiscount, 
+        {
+          net_rate: parsedNetRate,
+          you_save: parsedYouSave,
+          total: parsedTotal,
+          promo_discount: parsedPromoDiscount,
           additional_discount: parsedAdditionalDiscount,
           processing_fee: processingFee
         }
@@ -603,16 +572,15 @@ exports.createQuotation = async (req, res) => {
     } catch (pdfError) {
       await client.query('ROLLBACK');
       console.error(`PDF generation failed:`, pdfError.message);
-      return res.status(500).json({ 
-        message: 'Failed to generate PDF', 
-        error: pdfError.message, 
-        quotation_id 
+      return res.status(500).json({
+        message: 'Failed to generate PDF',
+        error: pdfError.message,
+        quotation_id
       });
     }
 
-    // === Check if quotation already exists ===
     const existingQuotation = await client.query(
-      'SELECT id FROM public.quotations WHERE quotation_id = $1', 
+      'SELECT id FROM public.quotations WHERE quotation_id = $1',
       [quotation_id]
     );
     if (existingQuotation.rows.length > 0) {
@@ -620,11 +588,10 @@ exports.createQuotation = async (req, res) => {
       return res.status(400).json({ message: 'Quotation ID already exists', quotation_id });
     }
 
-    // === Insert into Database ===
     const result = await client.query(`
       INSERT INTO public.quotations
-      (customer_id, quotation_id, products, net_rate, you_save, processing_fee, total, 
-       promo_discount, additional_discount, address, mobile_number, customer_name, 
+      (customer_id, quotation_id, products, net_rate, you_save, processing_fee, total,
+       promo_discount, additional_discount, address, mobile_number, customer_name,
        email, district, state, customer_type, status, created_at, pdf)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), $18)
       RETURNING id, created_at, customer_type, pdf, quotation_id
@@ -651,8 +618,6 @@ exports.createQuotation = async (req, res) => {
 
     await client.query('COMMIT');
 
-    console.log(`Quotation created successfully: ${quotation_id}`);
-
     return res.status(200).json({
       message: 'Quotation created successfully',
       quotation_id: result.rows[0].quotation_id,
@@ -662,10 +627,10 @@ exports.createQuotation = async (req, res) => {
   } catch (err) {
     if (client) await client.query('ROLLBACK');
     console.error(`Failed to create quotation ${req.body.quotation_id || ''}:`, err.message);
-    return res.status(500).json({ 
-      message: 'Failed to create quotation', 
-      error: err.message, 
-      quotation_id: req.body.quotation_id 
+    return res.status(500).json({
+      message: 'Failed to create quotation',
+      error: err.message,
+      quotation_id: req.body.quotation_id
     });
   } finally {
     if (client) client.release();
@@ -679,34 +644,31 @@ exports.updateQuotation = async (req, res) => {
   } = req.body;
 
   try {
-    // Validate inputs
     if (!quotation_id || !customer_id || !products || !Array.isArray(products)) {
       return res.status(400).json({ message: 'Invalid quotation data' });
     }
 
-    // Fetch customer details
     const customerQuery = await pool.query('SELECT * FROM customers WHERE id = $1', [customer_id]);
     if (customerQuery.rows.length === 0) {
       return res.status(404).json({ message: 'Customer not found' });
     }
     const customerDetails = customerQuery.rows[0];
 
-    // Generate PDF
-    const pdfPath = await generatePDF(
+    const pdfResult = await generatePDF(
       'quotation',
       { quotation_id, customer_type: customerDetails.customer_type },
       customerDetails,
       products,
       {
-        net_rate,
-        you_save,
-        processing_fee,
-        total,
+        net_rate: roundVal(net_rate),
+        you_save: roundVal(you_save),
+        processing_fee: roundVal(processing_fee),
+        total: roundVal(total),
         additional_discount,
       }
-    ).pdfPath;
+    );
+    const pdfPath = pdfResult.pdfPath;
 
-    // Update quotation in database, including customer details and PDF path
     const query = `
       UPDATE quotations
       SET customer_id = $1, products = $2, net_rate = $3, you_save = $4, processing_fee = $5, total = $6,
@@ -720,11 +682,11 @@ exports.updateQuotation = async (req, res) => {
     const values = [
       customer_id,
       JSON.stringify(products),
-      net_rate,
-      you_save,
-      processing_fee,
-      total,
-      promo_discount || 0,
+      roundVal(net_rate),
+      roundVal(you_save),
+      roundVal(processing_fee),
+      roundVal(total),
+      roundVal(promo_discount) || 0,
       additional_discount || 0,
       status || 'pending',
       customerDetails.customer_name || null,
@@ -743,7 +705,6 @@ exports.updateQuotation = async (req, res) => {
       return res.status(404).json({ message: 'Quotation not found' });
     }
 
-    // Send JSON response
     res.json({
       quotation_id,
       message: 'Quotation updated successfully',
@@ -757,14 +718,14 @@ exports.updateQuotation = async (req, res) => {
 exports.deleteQuotation = async (req, res) => {
   try {
     const { quotation_id } = req.params;
-    if (!quotation_id || !/^[a-zA-Z0-9-_]+$/.test(quotation_id)) 
+    if (!quotation_id || !/^[a-zA-Z0-9-_]+$/.test(quotation_id))
       return res.status(400).json({ message: 'Invalid or missing Quotation ID', quotation_id });
 
     const quotationCheck = await pool.query(
       'SELECT * FROM public.quotations WHERE quotation_id = $1 AND status = $2',
       [quotation_id, 'pending']
     );
-    if (quotationCheck.rows.length === 0) 
+    if (quotationCheck.rows.length === 0)
       return res.status(404).json({ message: 'Quotation not found or not in pending status', quotation_id });
 
     await pool.query(
@@ -774,7 +735,7 @@ exports.deleteQuotation = async (req, res) => {
 
     res.status(200).json({ message: 'Quotation canceled successfully', quotation_id });
   } catch (err) {
-    console.error(`Failed: Failed to cancel quotation for quotation_id ${req.params.quotation_id}: ${err.message}`);
+    console.error(`Failed to cancel quotation for quotation_id ${req.params.quotation_id}: ${err.message}`);
     res.status(500).json({ message: 'Failed to cancel quotation', error: err.message, quotation_id: req.params.quotation_id });
   }
 };
@@ -782,10 +743,8 @@ exports.deleteQuotation = async (req, res) => {
 exports.getQuotation = async (req, res) => {
   try {
     let { quotation_id } = req.params;
-    console.log(`getQuotation called with quotation_id: ${quotation_id}`);
 
     if (!quotation_id || quotation_id === 'undefined' || !/^[a-zA-Z0-9-_]+$/.test(quotation_id)) {
-      console.error(`Failed: Invalid or undefined quotation_id received: ${quotation_id}`);
       return res.status(400).json({ message: 'Invalid or missing quotation_id', received_quotation_id: quotation_id });
     }
 
@@ -809,7 +768,6 @@ exports.getQuotation = async (req, res) => {
     }
 
     if (quotationQuery.rows.length === 0) {
-      console.error(`Failed: No quotation found for quotation_id: ${quotation_id}`);
       return res.status(404).json({ message: 'Quotation not found', quotation_id });
     }
 
@@ -825,7 +783,6 @@ exports.getQuotation = async (req, res) => {
 
     let pdfPath = pdf;
     if (!fs.existsSync(pdf)) {
-      console.log(`PDF not found at ${pdf}, regenerating for quotation_id: ${quotation_id}`);
       let parsedProducts = typeof products === 'string' ? JSON.parse(products) : products;
       let enhancedProducts = [];
       for (const p of parsedProducts) {
@@ -840,19 +797,18 @@ exports.getQuotation = async (req, res) => {
       }
       const pdfResult = await generatePDF(
         'quotation',
-        { quotation_id, customer_type, total: parseFloat(total || 0), agent_name },
+        { quotation_id, customer_type, total: roundVal(total), agent_name },
         { customer_name, address, mobile_number, email, district, state },
         enhancedProducts,
-        { 
-          net_rate: parseFloat(net_rate || 0), 
-          you_save: parseFloat(you_save || 0), 
-          total: parseFloat(total || 0), 
-          promo_discount: parseFloat(promo_discount || 0),
+        {
+          net_rate: roundVal(net_rate),
+          you_save: roundVal(you_save),
+          total: roundVal(total),
+          promo_discount: roundVal(promo_discount),
           additional_discount: parseFloat(additional_discount || 0)
         }
       );
       pdfPath = pdfResult.pdfPath;
-      console.log(`PDF regenerated at: ${pdfPath} for quotation_id: ${quotation_id}`);
 
       await pool.query(
         'UPDATE public.quotations SET pdf = $1 WHERE quotation_id = $2',
@@ -861,13 +817,11 @@ exports.getQuotation = async (req, res) => {
     }
 
     if (!fs.existsSync(pdfPath)) {
-      console.error(`Failed: PDF file not found at ${pdfPath} for quotation_id: ${quotation_id}`);
       return res.status(404).json({ message: 'PDF file not found after generation', error: 'File system error', quotation_id });
     }
 
     fs.access(pdfPath, fs.constants.R_OK, (err) => {
       if (err) {
-        console.error(`Failed: Cannot read PDF file at ${pdfPath} for quotation_id ${quotation_id}: ${err.message}`);
         return res.status(500).json({ message: `Cannot read PDF file at ${pdfPath}`, error: err.message, quotation_id });
       }
       const safeCustomerName = (customer_name || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -875,16 +829,14 @@ exports.getQuotation = async (req, res) => {
       res.setHeader('Content-Disposition', `attachment; filename=${safeCustomerName}-${quotation_id}-quotation.pdf`);
       const readStream = fs.createReadStream(pdfPath);
       readStream.on('error', (streamErr) => {
-        console.error(`Failed: Failed to stream PDF for quotation_id ${quotation_id}: ${streamErr.message}`);
         if (!res.headersSent) {
           res.status(500).json({ message: 'Failed to stream PDF', error: streamErr.message, quotation_id });
         }
       });
       readStream.pipe(res);
-      console.log(`PDF streaming initiated for quotation_id: ${quotation_id}`);
     });
   } catch (err) {
-    console.error(`Failed: Failed to fetch quotation for quotation_id ${req.params.quotation_id}: ${err.message}`);
+    console.error(`Failed to fetch quotation for quotation_id ${req.params.quotation_id}: ${err.message}`);
     res.status(500).json({ message: 'Failed to fetch quotation', error: err.message, quotation_id: req.params.quotation_id });
   }
 };
@@ -897,22 +849,20 @@ exports.createBooking = async (req, res) => {
       customer_type, customer_name, address, mobile_number, email, district, state
     } = req.body;
 
-    console.log(`Received createBooking request with order_id: ${order_id}`);
-
-    if (!order_id || !/^[a-zA-Z0-9-_]+$/.test(order_id)) 
+    if (!order_id || !/^[a-zA-Z0-9-_]+$/.test(order_id))
       return res.status(400).json({ message: 'Invalid or missing Order ID', order_id });
 
-    if (!Array.isArray(products) || products.length === 0) 
+    if (!Array.isArray(products) || products.length === 0)
       return res.status(400).json({ message: 'Products array is required and must not be empty', order_id });
 
-    if (!total || isNaN(parseFloat(total)) || parseFloat(total) <= 0) 
+    if (!total || isNaN(parseFloat(total)) || parseFloat(total) <= 0)
       return res.status(400).json({ message: 'Total must be a positive number', order_id });
 
-    const parsedNetRate = parseFloat(net_rate) || 0;
-    const parsedYouSave = parseFloat(you_save) || 0;
-    const parsedPromoDiscount = parseFloat(promo_discount) || 0;
+    const parsedNetRate = roundVal(net_rate);
+    const parsedYouSave = roundVal(you_save);
+    const parsedPromoDiscount = roundVal(promo_discount);
     const parsedAdditionalDiscount = parseFloat(additional_discount) || 0;
-    const parsedTotal = parseFloat(total);
+    const parsedTotal = roundVal(total);
 
     if ([parsedNetRate, parsedYouSave, parsedPromoDiscount, parsedAdditionalDiscount, parsedTotal].some(v => isNaN(v)))
       return res.status(400).json({ message: 'net_rate, you_save, promo_discount, additional_discount, and total must be valid numbers', order_id });
@@ -926,7 +876,7 @@ exports.createBooking = async (req, res) => {
         'SELECT id, customer_name, address, mobile_number, email, district, state, customer_type, agent_id FROM public.customers WHERE id = $1',
         [customer_id]
       );
-      if (customerCheck.rows.length === 0) 
+      if (customerCheck.rows.length === 0)
         return res.status(404).json({ message: 'Customer not found', order_id });
 
       const customerRow = customerCheck.rows[0];
@@ -945,7 +895,7 @@ exports.createBooking = async (req, res) => {
         if (agentCheck.rows.length > 0) agent_name = agentCheck.rows[0].customer_name;
       }
     } else {
-      if (finalCustomerType !== 'User') 
+      if (finalCustomerType !== 'User')
         return res.status(400).json({ message: 'Customer type must be "User" for bookings without customer ID', order_id });
       if (!customer_name || !address || !district || !state || !mobile_number)
         return res.status(400).json({ message: 'All customer details must be provided', order_id });
@@ -978,9 +928,8 @@ exports.createBooking = async (req, res) => {
         { net_rate: parsedNetRate, you_save: parsedYouSave, total: parsedTotal, promo_discount: parsedPromoDiscount, additional_discount: parsedAdditionalDiscount }
       );
       pdfPath = pdfResult.pdfPath;
-      console.log(`PDF generated`);
     } catch (pdfError) {
-      console.error(`Failed: PDF generation failed for order_id ${order_id}: ${pdfError.message}`);
+      console.error(`PDF generation failed for order_id ${order_id}: ${pdfError.message}`);
       return res.status(500).json({ message: 'Failed to generate PDF', error: pdfError.message, order_id });
     }
 
@@ -995,7 +944,7 @@ exports.createBooking = async (req, res) => {
       }
 
       const result = await client.query(`
-        INSERT INTO public.bookings 
+        INSERT INTO public.bookings
         (customer_id, order_id, quotation_id, products, net_rate, you_save, total, promo_discount, additional_discount, address, mobile_number, customer_name, email, district, state, customer_type, status, created_at, pdf)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,NOW(),$18)
         RETURNING id, created_at, customer_type, pdf, order_id
@@ -1019,8 +968,6 @@ exports.createBooking = async (req, res) => {
         'booked',
         pdfPath
       ]);
-
-      console.log(`Booking created`);
 
       if (quotation_id) {
         const quotationCheck = await client.query(
@@ -1055,7 +1002,7 @@ exports.createBooking = async (req, res) => {
       await client.query('ROLLBACK');
       client.release();
     }
-    console.error(`Failed: Failed to create booking for order_id ${req.body.order_id}: ${err.message}`);
+    console.error(`Failed to create booking for order_id ${req.body.order_id}: ${err.message}`);
     res.status(500).json({ message: 'Failed to create booking', error: err.message, order_id: req.body.order_id });
   }
 };
@@ -1065,22 +1012,22 @@ exports.updateBooking = async (req, res) => {
     const { order_id } = req.params;
     const { products, net_rate, you_save, total, promo_discount, additional_discount, status, transport_details } = req.body;
 
-    if (!order_id || !/^[a-zA-Z0-9-_]+$/.test(order_id)) 
+    if (!order_id || !/^[a-zA-Z0-9-_]+$/.test(order_id))
       return res.status(400).json({ message: 'Invalid or missing Order ID', order_id });
-    if (products && (!Array.isArray(products) || products.length === 0)) 
+    if (products && (!Array.isArray(products) || products.length === 0))
       return res.status(400).json({ message: 'Products array is required and must not be empty', order_id });
-    if (total && (isNaN(parseFloat(total)) || parseFloat(total) <= 0)) 
+    if (total && (isNaN(parseFloat(total)) || parseFloat(total) <= 0))
       return res.status(400).json({ message: 'Total must be a positive number', order_id });
-    if (status && !['booked', 'paid', 'dispatched', 'canceled'].includes(status)) 
+    if (status && !['booked', 'paid', 'dispatched', 'canceled'].includes(status))
       return res.status(400).json({ message: 'Invalid status', order_id });
-    if (status === 'dispatched' && !transport_details) 
+    if (status === 'dispatched' && !transport_details)
       return res.status(400).json({ message: 'Transport details required for dispatched status', order_id });
 
-    const parsedNetRate = net_rate !== undefined ? parseFloat(net_rate) : undefined;
-    const parsedYouSave = you_save !== undefined ? parseFloat(you_save) : undefined;
-    const parsedPromoDiscount = promo_discount !== undefined ? parseFloat(promo_discount) : undefined;
+    const parsedNetRate = net_rate !== undefined ? roundVal(net_rate) : undefined;
+    const parsedYouSave = you_save !== undefined ? roundVal(you_save) : undefined;
+    const parsedPromoDiscount = promo_discount !== undefined ? roundVal(promo_discount) : undefined;
     const parsedAdditionalDiscount = additional_discount !== undefined ? parseFloat(additional_discount) : undefined;
-    const parsedTotal = total !== undefined ? parseFloat(total) : undefined;
+    const parsedTotal = total !== undefined ? roundVal(total) : undefined;
 
     if ([parsedNetRate, parsedYouSave, parsedPromoDiscount, parsedAdditionalDiscount, parsedTotal].some(v => v !== undefined && isNaN(v)))
       return res.status(400).json({ message: 'net_rate, you_save, total, promo_discount, and additional_discount must be valid numbers', order_id });
@@ -1089,7 +1036,7 @@ exports.updateBooking = async (req, res) => {
       'SELECT * FROM public.bookings WHERE order_id = $1',
       [order_id]
     );
-    if (bookingCheck.rows.length === 0) 
+    if (bookingCheck.rows.length === 0)
       return res.status(404).json({ message: 'Booking not found', order_id });
 
     const booking = bookingCheck.rows[0];
@@ -1138,19 +1085,18 @@ exports.updateBooking = async (req, res) => {
     if (products || parsedTotal !== undefined) {
       const pdfResult = await generatePDF(
         'invoice',
-        { order_id, customer_type: booking.customer_type, total: parsedTotal || parseFloat(booking.total || 0), agent_name },
+        { order_id, customer_type: booking.customer_type, total: parsedTotal || roundVal(booking.total), agent_name },
         customerDetails,
         enhancedProducts,
         {
-          net_rate: parsedNetRate !== undefined ? parsedNetRate : parseFloat(booking.net_rate || 0),
-          you_save: parsedYouSave !== undefined ? parsedYouSave : parseFloat(booking.you_save || 0),
-          total: parsedTotal !== undefined ? parsedTotal : parseFloat(booking.total || 0),
-          promo_discount: parsedPromoDiscount !== undefined ? parsedPromoDiscount : parseFloat(booking.promo_discount || 0),
+          net_rate: parsedNetRate !== undefined ? parsedNetRate : roundVal(booking.net_rate),
+          you_save: parsedYouSave !== undefined ? parsedYouSave : roundVal(booking.you_save),
+          total: parsedTotal !== undefined ? parsedTotal : roundVal(booking.total),
+          promo_discount: parsedPromoDiscount !== undefined ? parsedPromoDiscount : roundVal(booking.promo_discount),
           additional_discount: parsedAdditionalDiscount !== undefined ? parsedAdditionalDiscount : parseFloat(booking.additional_discount || 0)
         }
       );
       pdfPath = pdfResult.pdfPath;
-      console.log(`PDF regenerated at: ${pdfPath} for order_id: ${order_id}`);
     }
 
     const updateFields = [];
@@ -1200,22 +1146,20 @@ exports.updateBooking = async (req, res) => {
     }
 
     const query = `
-      UPDATE public.bookings 
+      UPDATE public.bookings
       SET ${updateFields.join(', ')}
       WHERE order_id = $${paramIndex}
       RETURNING id, order_id, status
     `;
     updateValues.push(order_id);
 
-    const result = await pool.query(query, updateValues);
+    await pool.query(query, updateValues);
 
     if (!fs.existsSync(pdfPath)) {
-      console.error(`Failed: PDF file not found at ${pdfPath} for order_id ${order_id}`);
       return res.status(500).json({ message: 'PDF file not found after update', error: 'File system error', order_id });
     }
     fs.access(pdfPath, fs.constants.R_OK, (err) => {
       if (err) {
-        console.error(`Failed: Cannot read PDF file at ${pdfPath} for order_id ${order_id}: ${err.message}`);
         return res.status(500).json({ message: `Cannot read PDF file at ${pdfPath}`, error: err.message, order_id });
       }
       const safeCustomerName = (customerDetails.customer_name || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -1223,26 +1167,22 @@ exports.updateBooking = async (req, res) => {
       res.setHeader('Content-Disposition', `attachment; filename=${safeCustomerName}-${order_id}-invoice.pdf`);
       const readStream = fs.createReadStream(pdfPath);
       readStream.on('error', (streamErr) => {
-        console.error(`Failed: Failed to stream PDF for order_id ${order_id}: ${streamErr.message}`);
         if (!res.headersSent) {
           res.status(500).json({ message: 'Failed to stream PDF', error: streamErr.message, order_id });
         }
       });
       readStream.pipe(res);
-      console.log(`PDF streaming initiated for order_id: ${order_id}`);
     });
   } catch (err) {
-    console.error(`Failed: Failed to update booking for order_id ${req.params.order_id}: ${err.message}`);
+    console.error(`Failed to update booking for order_id ${req.params.order_id}: ${err.message}`);
     res.status(500).json({ message: 'Failed to update booking', error: err.message, order_id: req.params.order_id });
   }
 };
 
 exports.getInvoice = async (req, res) => {
   const { order_id } = req.params;
-  console.log(`getInvoice called with order_id: ${order_id}`);
 
   if (!order_id || !/^[a-zA-Z0-9-_]+$/.test(order_id)) {
-    console.error(`Failed: Invalid order_id received: ${order_id}`);
     return res.status(400).json({ message: 'Invalid or missing order_id', received_order_id: order_id });
   }
 
@@ -1254,12 +1194,10 @@ exports.getInvoice = async (req, res) => {
       [order_id]
     );
     if (result.rows.length === 0) {
-      console.error(`Failed: No booking found for order_id: ${order_id}`);
       return res.status(404).json({ message: 'Booking not found', order_id });
     }
 
     const { pdf, products, net_rate, you_save, total, promo_discount, additional_discount, customer_name, address, mobile_number, email, district, state, customer_type, customer_id, status, created_at } = result.rows[0];
-    console.log(`getInvoice: Fetched created_at: ${created_at}`);
 
     let pdfPath = pdf;
     let agent_name = null;
@@ -1272,7 +1210,6 @@ exports.getInvoice = async (req, res) => {
       }
     }
 
-    // Validate products
     let parsedProducts;
     try {
       parsedProducts = typeof products === 'string' ? JSON.parse(products) : products;
@@ -1280,18 +1217,14 @@ exports.getInvoice = async (req, res) => {
         throw new Error('Products is not a valid array');
       }
     } catch (err) {
-      console.error(`Failed: Invalid products data for order_id ${order_id}: ${err.message}`);
       return res.status(500).json({ message: 'Invalid products data', error: err.message, order_id });
     }
 
-    // Force PDF regeneration for testing
-    console.log(`Forcing PDF regeneration for order_id: ${order_id}`);
     let enhancedProducts = [];
     for (const p of parsedProducts) {
       if (!p.per) {
         const tableName = p.product_type?.toLowerCase().replace(/\s+/g, '_');
         if (!tableName) {
-          console.error(`Failed: Invalid product_type for product ${p.id} in order_id ${order_id}`);
           return res.status(500).json({ message: 'Invalid product_type in products', order_id });
         }
         const productCheck = await client.query(`SELECT per FROM public.${tableName} WHERE id = $1`, [p.id]);
@@ -1306,26 +1239,24 @@ exports.getInvoice = async (req, res) => {
     try {
       pdfResult = await generatePDF(
         'invoice',
-        { order_id, customer_type, total: parseFloat(total || 0), agent_name },
+        { order_id, customer_type, total: roundVal(total), agent_name },
         { customer_name, address, mobile_number, email, district, state, created_at: created_at instanceof Date ? created_at.toISOString() : created_at },
         enhancedProducts,
-        { 
-          net_rate: parseFloat(net_rate || 0), 
-          you_save: parseFloat(you_save || 0), 
-          total: parseFloat(total || 0), 
-          promo_discount: parseFloat(promo_discount || 0),
+        {
+          net_rate: roundVal(net_rate),
+          you_save: roundVal(you_save),
+          total: roundVal(total),
+          promo_discount: roundVal(promo_discount),
           additional_discount: parseFloat(additional_discount || 0)
         }
       );
       pdfPath = pdfResult.pdfPath;
-      console.log(`PDF regenerated at: ${pdfPath} for order_id: ${order_id}`);
     } catch (pdfError) {
-      console.error(`Failed: PDF generation failed for order_id ${order_id}: ${pdfError.message}`);
+      console.error(`PDF generation failed for order_id ${order_id}: ${pdfError.message}`);
       return res.status(500).json({ message: 'Failed to generate PDF', error: pdfError.message, order_id });
     }
 
     if (!pdfPath) {
-      console.error(`Failed: pdfPath is undefined after generation for order_id ${order_id}`);
       return res.status(500).json({ message: 'PDF path is undefined after generation', order_id });
     }
 
@@ -1336,7 +1267,6 @@ exports.getInvoice = async (req, res) => {
 
     fs.access(pdfPath, fs.constants.R_OK, (err) => {
       if (err) {
-        console.error(`Failed: Cannot read PDF file at ${pdfPath} for order_id ${order_id}: ${err.message}`);
         return res.status(500).json({ message: `Cannot read PDF file at ${pdfPath}`, error: err.message, order_id });
       }
       const safeCustomerName = (customer_name || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -1344,16 +1274,14 @@ exports.getInvoice = async (req, res) => {
       res.setHeader('Content-Disposition', `attachment; filename=${safeCustomerName}-${order_id}-invoice.pdf`);
       const readStream = fs.createReadStream(pdfPath);
       readStream.on('error', (streamErr) => {
-        console.error(`Failed: Failed to stream PDF for order_id ${order_id}: ${streamErr.message}`);
         if (!res.headersSent) {
           res.status(500).json({ message: 'Failed to stream PDF', error: streamErr.message, order_id });
         }
       });
       readStream.pipe(res);
-      console.log(`PDF streaming initiated for order_id: ${order_id}`);
     });
   } catch (err) {
-    console.error(`Failed: Failed to fetch invoice for order_id ${order_id}: ${err.message}`);
+    console.error(`Failed to fetch invoice for order_id ${order_id}: ${err.message}`);
     return res.status(500).json({ message: 'Failed to fetch invoice', error: err.message, order_id });
   } finally {
     if (client) client.release();
@@ -1364,22 +1292,37 @@ exports.searchBookings = async (req, res) => {
   try {
     const { customer_name, mobile_number } = req.body;
 
-    if (!customer_name || !mobile_number) {
-      return res.status(400).json({ message: 'Customer name and mobile number are required' });
+    if (!mobile_number) {
+      return res.status(400).json({ 
+        message: "Mobile number is required" 
+      });
+    }
+    if (mobile_number.length !== 10) {
+      return res.status(400).json({ 
+        message: "Please enter a valid 10-digit mobile number" 
+      });
     }
 
-    const query = `
-      SELECT id, order_id, quotation_id, products, net_rate, you_save, total, 
-             promo_discount, customer_name, address, mobile_number, email, district, state, 
+    let query = `
+      SELECT id, order_id, quotation_id, products, net_rate, you_save, total,
+             promo_discount, customer_name, address, mobile_number, email, district, state,
              customer_type, status, created_at, pdf, transport_name, lr_number, transport_contact,
              processing_date, dispatch_date, delivery_date
-      FROM public.bookings 
-      WHERE LOWER(customer_name) LIKE LOWER($1) 
-      AND mobile_number LIKE $2
-      ORDER BY created_at DESC
+      FROM public.bookings
+      WHERE mobile_number LIKE $1
     `;
 
-    const result = await pool.query(query, [`%${customer_name}%`, `%${mobile_number}%`]);
+    const params = [`%${mobile_number}%`];
+
+    // If customer name is also provided, add it to search
+    if (customer_name && customer_name.trim()) {
+      query += ` AND LOWER(customer_name) LIKE LOWER($2)`;
+      params.push(`%${customer_name.trim()}%`);
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const result = await pool.query(query, params);
     res.status(200).json(result.rows);
   } catch (err) {
     console.error('Failed to search bookings:', err.message);
@@ -1391,22 +1334,36 @@ exports.searchQuotations = async (req, res) => {
   try {
     const { customer_name, mobile_number } = req.body;
 
-    if (!customer_name || !mobile_number) {
-      return res.status(400).json({ message: "Customer name and mobile number are required" });
+    if (!mobile_number) {
+      return res.status(400).json({ 
+        message: "Mobile number is required" 
+      });
+    }
+    if (mobile_number.length !== 10) {
+      return res.status(400).json({ 
+        message: "Please enter a valid 10-digit mobile number" 
+      });
     }
 
-    const query = `
-      SELECT id, quotation_id, products, net_rate, you_save, total, 
-             promo_discount, additional_discount, customer_name, address, mobile_number, email, district, state, 
+    let query = `
+      SELECT id, quotation_id, products, net_rate, you_save, total,
+             promo_discount, additional_discount, customer_name, address, mobile_number, email, district, state,
              customer_type, status, created_at, pdf
       FROM public.quotations
-      WHERE LOWER(customer_name) LIKE LOWER($1) 
-      AND mobile_number LIKE $2
-      ORDER BY created_at DESC
+      WHERE mobile_number LIKE $1
     `;
 
-    const result = await pool.query(query, [`%${customer_name}%`, `%${mobile_number}%`]);
-    
+    const params = [`%${mobile_number}%`];
+
+    if (customer_name && customer_name.trim()) {
+      query += ` AND LOWER(customer_name) LIKE LOWER($2)`;
+      params.push(`%${customer_name.trim()}%`);
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const result = await pool.query(query, params);
+
     const quotations = result.rows.map(row => ({
       ...row,
       type: 'quotation',
@@ -1419,6 +1376,7 @@ exports.searchQuotations = async (req, res) => {
 
     res.status(200).json(quotations);
   } catch (err) {
+    console.error('Failed to search quotations:', err.message);
     res.status(500).json({ message: "Failed to search quotations", error: err.message });
   }
 };
@@ -1442,7 +1400,6 @@ exports.exportQuotationsToExcel = async (req, res) => {
 
     const quotations = result.rows;
 
-    // Group by customer_type
     const grouped = quotations.reduce((acc, q) => {
       let type = q.customer_type?.trim() || "User";
       if (type === "Customer of Selected Agent") type = "Customer of Selected Agent";
@@ -1464,7 +1421,6 @@ exports.exportQuotationsToExcel = async (req, res) => {
       let data = grouped[type] || [];
       if (data.length === 0) continue;
 
-      // Fetch Agent Name only for "Customer of Selected Agent"
       if (type === "Customer of Selected Agent") {
         for (let q of data) {
           if (q.customer_id) {
@@ -1489,7 +1445,7 @@ exports.exportQuotationsToExcel = async (req, res) => {
         "Quotation ID": q.quotation_id || "N/A",
         "Customer Name": q.customer_name || "N/A",
         "Customer Type": q.customer_type || "User",
-        "Total Amount": q.total ? `₹${Math.round(Number(q.total))}` : "₹0",
+        "Total Amount": q.total ? `₹${roundVal(q.total)}` : "₹0",
         "Date": q.created_at ? new Date(q.created_at).toLocaleDateString('en-GB') : "N/A",
         ...(type === "Customer of Selected Agent" ? { "Agent Name": q.agent_name || "N/A" } : {})
       }));
@@ -1509,9 +1465,6 @@ exports.exportQuotationsToExcel = async (req, res) => {
     }
 
     try {
-      console.log("Generating Agent-wise Product Quotation Sheets...");
-
-      // Fetch all quotations under "Customer of Selected Agent" with agent_name joined
       const agentQuotationsResult = await client.query(`
         SELECT q.products, q.customer_id, c2.customer_name AS agent_name
         FROM public.quotations q
@@ -1522,7 +1475,6 @@ exports.exportQuotationsToExcel = async (req, res) => {
           AND q.products IS NOT NULL
       `);
 
-      // Aggregate: Agent → Product → Total Quantity
       const agentProductTotals = {};
 
       for (const row of agentQuotationsResult.rows) {
@@ -1543,7 +1495,6 @@ exports.exportQuotationsToExcel = async (req, res) => {
         });
       }
 
-      // Create one sheet per agent
       for (const [agentName, productMap] of Object.entries(agentProductTotals)) {
         const rows = Object.entries(productMap)
           .map(([productName, totalQty]) => ({
@@ -1556,13 +1507,11 @@ exports.exportQuotationsToExcel = async (req, res) => {
 
         const worksheet = XLSX.utils.json_to_sheet(rows);
 
-        // Auto-size columns
         worksheet["!cols"] = [
           { wch: 45 },
           { wch: 20 }
         ];
 
-        // Safe sheet name
         let baseName = agentName.replace(/[*?:/\\[\]]/g, "_").substring(0, 28);
         if (baseName.length < 3) baseName = "Agent";
         let sheetName = baseName;
@@ -1575,7 +1524,6 @@ exports.exportQuotationsToExcel = async (req, res) => {
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
       }
 
-      // Optional: Add "All Agents Combined" Summary Sheet
       const allAgentProducts = {};
       for (const productMap of Object.values(agentProductTotals)) {
         for (const [name, qty] of Object.entries(productMap)) {
@@ -1597,7 +1545,6 @@ exports.exportQuotationsToExcel = async (req, res) => {
       }
     } catch (agentErr) {
       console.error("Agent product sheets failed (continuing export):", agentErr.message);
-      // Non-critical error — continue
     }
 
     const fileName = `PhoenixCrackers_Export_${new Date().toISOString().slice(0,10)}.xlsx`;
@@ -1610,8 +1557,6 @@ exports.exportQuotationsToExcel = async (req, res) => {
       if (err) {
         console.error("Download failed:");
         if (!res.headersSent) res.status(500).send("Failed to download file");
-      } else {
-        console.log(`Exported successfully: ${fileName}`);
       }
     });
 
