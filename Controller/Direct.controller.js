@@ -35,7 +35,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
         contact: 'www.palaniyappacrackers.com   |   +91 81242 59430   |   sreepalaniyappacrackers@gmail.com',
         address: 'Vaanakkar street, Salem, Tamil Nadu',
         accent: '#EA580C',
-        footerText: 'Thank you for your business with Sree Planiyappa Crackers, Sivakasi'
+        footerText: 'Thank you for your business with Sree Palaniyappa Crackers, Sivakasi'
       };
 
       const C = {
@@ -271,9 +271,13 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       const youSave = roundVal(dbValues.you_save);
       const additionalDiscount = parseFloat(dbValues.additional_discount) || 0;
       const promoDiscount = roundVal(dbValues.promo_discount);
+      const processingFeeRaw = parseFloat(dbValues.processing_fee) || 0;
+
       const subtotal = netRate - youSave;
       const addDiscAmt = roundVal(subtotal * (additionalDiscount / 100));
-      const grandTotal = subtotal - addDiscAmt - promoDiscount;
+      const discountedSubtotal = subtotal - addDiscAmt - promoDiscount;
+      const processingFee = processingFeeRaw || roundVal(discountedSubtotal * 0.01);
+      const grandTotal = discountedSubtotal + processingFee;
 
       const totalsH = 160;
       ensureSpace(totalsH + 30);
@@ -308,6 +312,7 @@ const generatePDF = (type, data, customerDetails, products, dbValues, options = 
       if (youSave > 0) totRow('You Save', `- Rs.${youSave}`);
       if (additionalDiscount > 0) totRow(`Extra Disc (${additionalDiscount}%)`, `- Rs.${addDiscAmt}`);
       if (promoDiscount > 0) totRow('Promo Discount', `- Rs.${promoDiscount}`);
+      totRow('Processing Fee (1%)', `Rs.${processingFee}`);
       totRow('Grand Total', `Rs.${grandTotal}`);
 
       drawPageFooter(pageNum);
